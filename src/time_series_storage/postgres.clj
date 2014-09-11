@@ -12,23 +12,40 @@
               :password "datomic"
               :subname "//localhost:5432/dosierer"})
 
-
 (defrecord Postgres [config]
   TimeSeries
   (add-fact [service id type slice options]
-    )
+    (schema/create-fact! db-spec
+                         (keyword id)
+                         (keyword type)
+                         slice
+                         options))
 
   (add-dimension [service id options]
-    )
+    (schema/create-dimension! db-spec
+                              (keyword id)
+                              options))
 
   (new-fact [service id value categories]
-    )
+    (u/new-fact db-spec
+                id
+                value
+                categories))
 
-  (get-timeseries [service fact dimensions start finish]
-    )
+  (get-timeseries [service fact dimension query-data start finish]
+    (if-let [fact-def (schema/get-fact db-spec fact)]
+      (if-let [dim-def (schema/get-dimension db-spec dimension)]
+        (q/query db-spec
+                 fact-def
+                 dim-def
+                 query-data
+                 (tcoerce/from-date start)
+                 (tcoerce/from-date finish))
+        (throw (Exception. (format "Non existent dimension %s specified. Please check your schema" dimension))))
+      (throw (Exception. (format "Non existent fact %s specified. Please check your schema." fact)))))
 
-  (get-histogram [service fact dimensions start finish]
-                 [service fact dimensions start finish merge-with]
+  (get-histogram [service fact dimension query-data start finish]
+                 [service fact dimension query-data start finish merge-with]
     ))
 
 (comment

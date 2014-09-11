@@ -12,10 +12,10 @@
     "Notifies of new event occurred, generates event tracking
      information for the fact on all the specified categories")
 
-  (get-timeseries [service fact dimensions start finish]
+  (get-timeseries [service fact dimension query-data start finish]
     "Retrieves the complete timeseries for the queried range of the fact")
 
-  (get-histogram [service fact dimensions start finish]
-                 [service fact dimensions start finish merge-with]
+  (get-histogram [service fact dimension query-data start finish]
+                 [service fact dimension query-data start finish merge-with]
     "Retrieves a single row histogram for the fact, if merge-with
      not specified histogram time-series is merged with +"))
