@@ -3,6 +3,7 @@
   (:require [time-series-storage.api :refer [TimeSeries]]
             [clojure.java.jdbc :as j]
             [clj-time.core :as t]
+            [clj-time.coerce :as tcoerce]
             [clj-time.format :as tformat]
             [clojure.string :as string])
   (:use sqlingvo.core))
@@ -108,7 +109,13 @@
       defs)))
 
 (defn get-dimension
-  [])
+  [db id]
+  (when-let [dim (first
+                  (j/query db
+                    (sql (select [*]
+                                 (from :dimensions)
+                                 (where `(= :id ~(name id)))))))]
+    (update-in dim [:grouped_by] read-string)))
 
 (defn make-table-name
   "Given a fact and a sorted list of dimensions retrieves
@@ -181,7 +188,7 @@
     (throw (Exception. "Some specified dimensions to group-by do not exist"))))
 
 
-(defn get-current-slice
+(defn get-slice
   ([slice-size]
      (get-current-slice slice-size (t/now)))
   ([slice-size date]
@@ -200,8 +207,8 @@
   [fact dimension event]
   (merge (select-keys event (:grouped_by dimension))
          {(keyword (:id dimension)) (get event (keyword (:id dimension)))
-          :timestamp (get-current-slice (or (:slice dimension)
-                                            (:slice fact)))}))
+          :timestamp (get-slice (or (:slice dimension)
+                                    (:slice fact)))}))
 
 (defn expand-condition
   [keyvals]
@@ -219,7 +226,7 @@
                          (where (expand-condition key))
                          (returning *))]
         (insert table-name (conj (keys key) :counter)
-                (select (conj (vals key) 1))
+                (select (conj (vec (vals key)) 1))
                 (where `(not-exists ~(select [*] (from :upsert))))))))
 
 (defmethod make-dimension-fact :average
@@ -228,11 +235,14 @@
                         (make-table-name fact))
         key (event-key fact dimension event)
         value (get event (keyword (:id fact)))]
-    (with [:upsert (update table-name `((= counter counter+1) (= total total+~value))
+    (with [:upsert (update table-name (conj '()
+                                            '(= counter counter+1)
+                                            (concat '(= total)
+                                                    [(symbol (str "total+" value))]))
                          (where (expand-condition key))
                          (returning *))]
           (insert table-name (concat (keys key) [:counter :total])
-                  (select (conj (vals key) 1 value))
+                  (select (conj (vec (vals key)) 1 value))
                   (where `(not-exists ~(select [*] (from :upsert))))))))
 
 (defn new-fact
@@ -242,16 +252,40 @@
   [db id value categories]
   (if-let [fact (get-fact db id)]
     ;;TODO:this should be cached on key set!
-    (if-let [dims (get-dimensions (keys categories))]
+    (if-let [dims (get-dimensions db (keys categories))]
       ;;for each dimension definition update fact in properly grouped tables
-      (let [tx (for [d (vals dims)]
+      (let [tx (for [d (filter #(not (:group_only %)) (vals dims))]
                  (make-dimension-fact fact d (merge categories {id value})))]
         (j/with-db-transaction [t db]
           (doseq [st tx]
             (j/execute! t
-                        (sql t)))))
+                        (sql st)))))
       (throw (Exception. "Some specified dimensions do not exist")))
     (throw (Exception. (format "Fact %s is not defined" id)))))
+
+
+(defn range-where
+  "Retrieves a time-ranged condition for a specific fact in
+   a specific dimension path"
+  [fact dimension filter-data start finish]
+  `(and ~@(for [[k v] (merge (select-keys filter-data (:grouped_by dimension))
+                             {(keyword (:id dimension)) (get filter-data (keyword (:id dimension)))})]
+                `(= ~k ~v))
+        (>= :timestamp ~(get-slice (or (:slice dimension)
+                                       (:slice fact)) start))
+        (<= :timestamp ~(get-slice (or (:slice dimension)
+                                       (:slice fact)) finish))))
+
+(defn query
+  [db fact dimension filter-data start finish]
+  (let [table-name (->> (conj (:grouped_by dimension) (:id dimension))
+                        (make-table-name fact))
+        condition (range-where fact dimension filter-data start finish)]
+    (j/query db
+      (sql
+       (select [*]
+               (from table-name)
+               (where condition))))))
 
 (defrecord Postgres [config]
   TimeSeries
@@ -270,3 +304,64 @@
   (get-histogram [service fact dimensions start finish]
                  [service fact dimensions start finish merge-with]
     ))
+
+(comment
+
+  ;;create-counter
+  (create-fact! db-spec :registros :counter 15 {:name "Cantidad de registros"
+                                                :filler 0
+                                                :units "counter"})
+
+  ;;create-average
+  (create-fact! db-spec :avg_time :average 15 {:name "Tiempo promedio"
+                                               :filler 0
+                                               :units "seconds"})
+  ;;create-histogram
+  (create-fact! db-spec :time-distr :histogram 15 {:name "Histograma de tiempo"
+                                                   :filler 0
+                                                   :units "seconds"
+                                                   :start 0
+                                                   :end 1000
+                                                   :step 100})
+
+  ;;
+  (create-dimension! db-spec :company {:group_only true :name "Compania"})
+  (create-dimension! db-spec :campaign {:grouped_by [:company] :name "Campania"})
+  (create-dimension! db-spec :channel {:grouped_by [:company :campaign] :name "Canal"})
+
+  (create-dimension! db-spec :dependency {:name "Dependencia de Correo"})
+  (create-dimension! db-spec :dependency_user {:grouped_by [:dependency] :name "Usuario"})
+
+  (new-fact db-spec :registros 1 {:dependency "32" :dependency_user "juanele"})
+  (new-fact db-spec :avg_time 15 {:company "bbva" :campaign "ventas" :channel "web"})
+  (new-fact db-spec :avg_time 15 {:company "bbva" :campaign "ventas" :channel "mail"})
+
+  (query db-spec
+         (get-fact db-spec :avg_time)
+         (get-dimension db-spec :campaign)
+         {:company "bbva" :campaign "ventas"}
+         (tcoerce/from-date #inst "2012-01-01")
+         (tcoerce/from-date #inst "2020-01-01"))
+
+  (query db-spec
+         (get-fact db-spec :avg_time)
+         (get-dimension db-spec :channel)
+         {:company "bbva" :campaign "ventas" :channel "web"}
+         (tcoerce/from-date #inst "2012-01-01")
+         (tcoerce/from-date #inst "2020-01-01"))
+
+  (query db-spec
+         (get-fact db-spec :registros)
+         (get-dimension db-spec :dependency)
+         {:dependency "32"}
+         (tcoerce/from-date #inst "2012-01-01")
+         (tcoerce/from-date #inst "2020-01-01"))
+
+  (query db-spec
+         (get-fact db-spec :registros)
+         (get-dimension db-spec :dependency)
+         {:dependency "35"}
+         (tcoerce/from-date #inst "2012-01-01")
+         (tcoerce/from-date #inst "2020-01-01"))
+
+  )
