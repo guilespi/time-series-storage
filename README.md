@@ -1,4 +1,5 @@
-# time-series-storage
+time-series-storage
+-
 
 A Clojure library designed to store time-series oriented metrics.
 
@@ -10,10 +11,10 @@ Support for `Postgres` and `Cassandra` will be added.
 Intended to be useful as a side-companion to Datomic if you need to
 keep track of mutable trends using the same backend.
 
-##Concepts
+Concepts
+-
 
-Facts
-=====
+####Facts
 
 Anything you need to keep track of, count or aggregate.
 
@@ -21,8 +22,7 @@ Can be discrete events such as `conversions` or `visits`, or events
 with a magnitude, such as `conversion-time`.
 
 
-Dimensions
----
+##Dimensions
 
 Any category you want your facts to be categorized, grouped or
 filtered by.
@@ -30,11 +30,12 @@ filtered by.
 Usually named values such as `country`, `operating-system`,
 `referral`, etc.
 
-## Usage
+Usage
+-
 
 Work in progress. should be moved to the protocol api samples
 
-```
+```clojure
 ;;create-counter
   (schema/create-fact! db-spec :registros :counter 15 {:name "Cantidad de registros"
                                                 :filler 0
@@ -93,8 +94,8 @@ Work in progress. should be moved to the protocol api samples
            (tcoerce/from-date #inst "2020-01-01"))
 ```
 
-
-## License
+License
+----
 
 Copyright © 2014 Guillermo Winkler
 
