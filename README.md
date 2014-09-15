@@ -36,6 +36,21 @@ Usage
 Work in progress. should be moved to the protocol api samples
 
 ```clojure
+
+(def db-spec {:classname "org.postgresql.Driver"
+                      :subprotocol "postgresql"
+                      :user "datomic"
+                      :password "datomic"
+                      :subname "//localhost:5432/database"})
+
+(require '[time-series-storage.api :as t]
+(import '[time_series_storage.postgres Postgres])
+(def service (->Postgres db-spec))
+
+(t/add-fact service ...)
+
+```
+```clojure
 ;;create-counter
   (schema/create-fact! db-spec :registros :counter 15 {:name "Cantidad de registros"
                                                 :filler 0
