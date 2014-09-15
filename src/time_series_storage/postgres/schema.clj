@@ -112,7 +112,7 @@
                :name name
                :slice slice
                :group_only (or group_only false)
-               :grouped_by (pr-str (or grouped_by []))})))
+               :grouped_by (pr-str (or grouped_by [[]]))})))
 
 
 (defmulti create-fact-column (fn [_ fact] (keyword (:type fact))))
@@ -161,17 +161,17 @@
    tables needed to keep track of all the configured faacts up to
    the moment"
   [db id opts]
-  (if (or (nil? (seq (:grouped_by opts)))
-          (get-dimensions db (:grouped_by opts)))
-    (let [facts (all-facts db)
-          dimension (conj (:grouped_by opts) id)
-          tx (concat
-              [(make-dimension id opts)]
-              (when (not (:group_only opts))
-                (for [f facts]
-                  (make-time-series-table f dimension))))]
-      (j/with-db-transaction [t db]
-        (doseq [st tx]
-          (j/execute! t
-                      (sql st)))))
-    (throw (Exception. "Some specified dimensions to group-by do not exist"))))
+  (let [facts (all-facts db)
+        grouped-by (or (:grouped_by opts) [[]])
+        tx (concat
+            [(make-dimension id opts)]
+            (when (not (:group_only opts))
+              (for [fact facts
+                    group grouped-by]
+                (if (get-dimensions db group)
+                  (make-time-series-table fact (conj group id))
+                  (throw (Exception. (format "Some specified dimensions to group-by do not exist on:" group)))))))]
+    (j/with-db-transaction [t db]
+                (doseq [st tx]
+                  (j/execute! t
+                              (sql st))))))
