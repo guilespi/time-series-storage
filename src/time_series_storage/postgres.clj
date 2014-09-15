@@ -6,36 +6,34 @@
             [clj-time.coerce :as tcoerce]))
 
 
-(def db-spec {:classname "org.postgresql.Driver"
-              :subprotocol "postgresql"
-              :user "datomic"
-              :password "datomic"
-              :subname "//localhost:5432/dosierer"})
-
 (defrecord Postgres [config]
   TimeSeries
+  (init-schema [service]
+    (schema/create-facts-table! config)
+    (schema/create-dimensions-table! config))
+
   (add-fact [service id type slice options]
-    (schema/create-fact! db-spec
+    (schema/create-fact! config
                          (keyword id)
                          (keyword type)
                          slice
                          options))
 
   (add-dimension [service id options]
-    (schema/create-dimension! db-spec
+    (schema/create-dimension! config
                               (keyword id)
                               options))
 
   (new-fact [service id value categories]
-    (u/new-fact db-spec
+    (u/new-fact config
                 id
                 value
                 categories))
 
   (get-timeseries [service fact dimension query-data start finish]
-    (if-let [fact-def (schema/get-fact db-spec fact)]
-      (if-let [dim-def (schema/get-dimension db-spec dimension)]
-        (q/query db-spec
+    (if-let [fact-def (schema/get-fact config fact)]
+      (if-let [dim-def (schema/get-dimension config dimension)]
+        (q/query config
                  fact-def
                  dim-def
                  query-data

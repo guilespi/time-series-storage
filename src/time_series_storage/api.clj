@@ -18,4 +18,7 @@
   (get-histogram [service fact dimension query-data start finish]
                  [service fact dimension query-data start finish merge-with]
     "Retrieves a single row histogram for the fact, if merge-with
-     not specified histogram time-series is merged with +"))
+     not specified histogram time-series is merged with +")
+
+  (init-schema [service]
+    "Initializes schema"))
