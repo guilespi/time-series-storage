@@ -8,26 +8,32 @@
 
 (defrecord Postgres [config]
   TimeSeries
-  (init-schema [service]
+  (init-schema! [service]
     (schema/create-facts-table! config)
     (schema/create-dimensions-table! config))
 
-  (add-fact [service id type slice options]
+  (add-fact! [service id type slice options]
     (schema/create-fact! config
                          (keyword id)
                          (keyword type)
                          slice
                          options))
 
-  (add-dimension [service id options]
+  (add-dimension! [service id options]
     (schema/create-dimension! config
                               (keyword id)
                               options))
 
-  (new-fact [service id value categories]
+  (new-fact! [service id value categories]
     (u/new-fact config
                 id
                 value
+                categories))
+
+  (inc! [service id categories]
+    (u/new-fact config
+                id
+                1
                 categories))
 
   (get-timeseries [service fact dimension query-data start finish]
