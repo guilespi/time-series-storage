@@ -3,6 +3,7 @@
             [time-series-storage.postgres.schema :as schema]
             [time-series-storage.postgres.query :as q]
             [time-series-storage.postgres.update :as u]
+            [clj-time.core :as t]
             [clj-time.coerce :as tcoerce]))
 
 
@@ -27,11 +28,27 @@
   (new-fact! [service id value categories]
     (u/new-fact config
                 id
+                (t/now)
+                value
+                categories))
+
+  (new-fact! [service timestamp id value categories]
+    (u/new-fact config
+                id
+                (tcoerce/from-date timestamp)
                 value
                 categories))
 
   (inc! [service id categories]
     (u/new-fact config
+                (t/now)
+                id
+                1
+                categories))
+
+  (inc! [service id timestamp categories]
+    (u/new-fact config
+                (tcoerce/from-date timestamp)
                 id
                 1
                 categories))

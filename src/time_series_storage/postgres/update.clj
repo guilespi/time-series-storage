@@ -10,11 +10,12 @@
   "Returns the particular key for updating a fact in a specific dimension.
   This WILL consider timestamp as one of the default key columns, and WILL calculate
   the bucket according to time."
-  [fact dimension group event]
+  [fact dimension group event datetime]
   (merge (select-keys event group)
          {(keyword (:id dimension)) (get event (keyword (:id dimension)))
           :timestamp (get-slice (or (:slice dimension)
-                                    (:slice fact)))}))
+                                    (:slice fact))
+                                datetime)}))
 
 (defn expand-condition
   "Given a map of key-values creates a condition assuming equality
@@ -32,11 +33,11 @@
 (defmethod make-dimension-fact :counter
   ;;Makes a statement for upserting counters on a specific fact and
   ;;dimension hierarchy
-  [fact dimension event]
+  [fact dimension event date-time]
   (for [group (:grouped_by dimension)]
     (let [table-name (->> (conj group (:id dimension))
                           (make-table-name fact))
-          key (event-key fact dimension group event)]
+          key (event-key fact dimension group event date-time)]
       (with [:upsert (update table-name '((= counter counter+1))
                              (where (expand-condition key))
                              (returning *))]
@@ -47,11 +48,11 @@
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
   ;;dimension hierarchy
-  [fact dimension event]
+  [fact dimension event date-time]
   (for [group (:grouped_by dimension)]
     (let [table-name (->> (conj group (:id dimension))
                           (make-table-name fact))
-          key (event-key fact dimension group event)
+          key (event-key fact dimension group event date-time)
           value (get event (keyword (:id fact)))]
       (with [:upsert (update table-name (conj '()
                                               '(= counter counter+1)
@@ -67,14 +68,14 @@
   "When a new fact occurs update all the corresponding dimensions specified in the fact
    categories. If some category is not updatable the complete fact fails (this is in
    order to avoid counter mismatches)"
-  [db id value categories]
+  [db id timestamp value categories]
   (if-let [fact (schema/get-fact db id)]
     ;;TODO:this should be cached on key set!
     (if-let [dims (schema/get-dimensions db (keys categories))]
       ;;for each dimension definition update fact in properly grouped tables
       (let [tx (apply concat
                       (for [d (filter #(not (:group_only %)) (vals dims))]
-                        (make-dimension-fact fact d (merge categories {id value}))))]
+                        (make-dimension-fact fact d (merge categories {id value}) timestamp)))]
         (j/with-db-transaction [t db]
           (doseq [st tx]
             (j/execute! t

@@ -9,10 +9,12 @@
     "Adds a new dimension to the service database")
 
   (new-fact! [service id value categories]
+             [service timestamp id value categories]
     "Notifies of new event occurred, generates event tracking
      information for the fact on all the specified categories")
 
   (inc! [service id categories]
+        [service id timestamp categories]
     "Notifies of new counter event occurred and increments
      its value in all the specified categories")
 
