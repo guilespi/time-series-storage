@@ -1,4 +1,5 @@
 (ns time-series-storage.postgres
+  (:gen-class)
   (:require [time-series-storage.api :refer [TimeSeries]]
             [time-series-storage.postgres.schema :as schema]
             [time-series-storage.postgres.query :as q]
@@ -41,15 +42,15 @@
 
   (inc! [service id categories]
     (u/new-fact config
-                (t/now)
                 id
+                (t/now)
                 1
                 categories))
 
   (inc! [service id timestamp categories]
     (u/new-fact config
-                (tcoerce/from-date timestamp)
                 id
+                (tcoerce/from-date timestamp)
                 1
                 categories))
 
