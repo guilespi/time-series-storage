@@ -28,7 +28,7 @@
   `(and ~@(for [[k v] keyvals]
             `(= ~k ~v))))
 
-(defmulti make-dimension-fact (fn [f _ _] (keyword (:type f))))
+(defmulti make-dimension-fact (fn [f _ _ _] (keyword (:type f))))
 
 (defmethod make-dimension-fact :counter
   ;;Makes a statement for upserting counters on a specific fact and
@@ -69,16 +69,18 @@
    categories. If some category is not updatable the complete fact fails (this is in
    order to avoid counter mismatches)"
   [db id timestamp value categories]
-  (if-let [fact (schema/get-fact db id)]
-    ;;TODO:this should be cached on key set!
-    (if-let [dims (schema/get-dimensions db (keys categories))]
-      ;;for each dimension definition update fact in properly grouped tables
-      (let [tx (apply concat
-                      (for [d (filter #(not (:group_only %)) (vals dims))]
-                        (make-dimension-fact fact d (merge categories {id value}) timestamp)))]
-        (j/with-db-transaction [t db]
-          (doseq [st tx]
-            (j/execute! t
-                        (sql st)))))
-      (throw (Exception. "Some specified dimensions do not exist")))
-    (throw (Exception. (format "Fact %s is not defined" id)))))
+  (if (some nil? (vals categories))
+    (throw (Exception. "Some categories have nil values"))
+    (if-let [fact (schema/get-fact db id)]
+      ;;TODO:this should be cached on key set!
+      (if-let [dims (schema/get-dimensions db (keys categories))]
+        ;;for each dimension definition update fact in properly grouped tables
+        (let [tx (apply concat
+                        (for [d (filter #(not (:group_only %)) (vals dims))]
+                          (make-dimension-fact fact d (merge categories {id value}) timestamp)))]
+          (j/with-db-transaction [t db]
+            (doseq [st tx]
+              (j/execute! t
+                          (sql st)))))
+        (throw (Exception. "Some specified dimensions do not exist")))
+      (throw (Exception. (format "Fact %s is not defined" id))))))
