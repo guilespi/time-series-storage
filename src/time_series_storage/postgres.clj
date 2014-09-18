@@ -5,8 +5,29 @@
             [time-series-storage.postgres.query :as q]
             [time-series-storage.postgres.update :as u]
             [clj-time.core :as t]
-            [clj-time.coerce :as tcoerce]))
+            [clj-time.coerce :as tcoerce])
+  (:use [time-series-storage.query]))
 
+
+
+(defn- q
+  [config fact dimension query-data start finish step]
+  (if-let [fact-def (schema/get-fact config fact)]
+    (if-let [dim-def (schema/get-dimension config dimension)]
+      (let [data-points (q/query config
+                                 fact-def
+                                 dim-def
+                                 query-data
+                                 (tcoerce/from-date start)
+                                 (tcoerce/from-date finish))]
+        (if step
+          (fill-range start
+                      finish
+                      step
+                      (collapse data-points step))
+          data-points))
+      (throw (Exception. (format "Non existent dimension %s specified. Please check your schema" dimension))))
+    (throw (Exception. (format "Non existent fact %s specified. Please check your schema." fact)))))
 
 (defrecord Postgres [config]
   TimeSeries
@@ -54,17 +75,11 @@
                 1
                 categories))
 
+  (get-timeseries [service fact dimension query-data start finish step]
+    (q config fact dimension query-data start finish step))
+
   (get-timeseries [service fact dimension query-data start finish]
-    (if-let [fact-def (schema/get-fact config fact)]
-      (if-let [dim-def (schema/get-dimension config dimension)]
-        (q/query config
-                 fact-def
-                 dim-def
-                 query-data
-                 (tcoerce/from-date start)
-                 (tcoerce/from-date finish))
-        (throw (Exception. (format "Non existent dimension %s specified. Please check your schema" dimension))))
-      (throw (Exception. (format "Non existent fact %s specified. Please check your schema." fact)))))
+    (q config fact dimension query-data start finish nil))
 
   (get-histogram [service fact dimension query-data start finish]
                  [service fact dimension query-data start finish merge-with]

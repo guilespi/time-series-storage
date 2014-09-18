@@ -1,0 +1,89 @@
+(ns time-series-storage.query
+  (:require [clj-time.coerce :as tcoerce]
+            [clj-time.format :as tformat]
+            [clj-time.core :as t]))
+
+(defn time-dimension
+  [collapse-by row]
+  (let [date (tcoerce/from-string (:timestamp row))
+        dow (t/day-of-week date)]
+    (condp = collapse-by
+      :day (tformat/unparse (tformat/formatters :basic-date-time)
+                            (t/date-time (t/year date)
+                                         (t/month date)
+                                         (t/day date)
+                                         0
+                                         0))
+      :hour (tformat/unparse (tformat/formatters :basic-date-time)
+                             (t/date-time (t/year date)
+                                          (t/month date)
+                                          (t/day date)
+                                          (t/hour date)
+                                          0))
+      :week (let [start-of-week (t/minus- date (t/days (t/day-of-week date)))]
+              (tformat/unparse (tformat/formatters :basic-date-time)
+                               (t/date-time (t/year start-of-week)
+                                            (t/month start-of-week)
+                                            (t/day start-of-week)
+                                            0
+                                            0)))
+      :month (tformat/unparse (tformat/formatters :basic-date-time)
+                              (t/date-time (t/year date)
+                                           (t/month date)
+                                           1
+                                           0
+                                           0)))))
+
+;;TODO: this should be done inside the library with knowledge about
+;;the dimension type not here infering stuff
+(defmulti collapse (fn [[r & rest] by]
+                     (cond
+                      (and (:counter r)
+                           (:total r)) :average
+                      (:counter r) :counter
+                      :else (throw (Exception. "Unknown row type to collapse")))))
+
+(defmethod collapse :counter
+  [rows by]
+  (->> (group-by (partial time-dimension by) rows)
+       (map (fn [[k v]]
+              {(tcoerce/from-string k) (reduce #(+ %1 (:counter %2)) 0 v)}))
+       (apply merge)))
+
+
+(defmethod collapse :average
+  [rows by]
+  (->> (group-by (partial time-dimension by) rows)
+       (map (fn [[k v]]
+              {(tcoerce/from-string k) (reduce #(merge-with + %1 (select-keys %2 [:counter
+                                                                                  :total]))
+                                               {:counter 0
+                                                :total 0}
+                                               v)}))))
+
+(defmethod collapse :histogram
+  [rows by]
+  (throw (Exception. "histogram collapsing not yet ready")))
+
+
+(defn time-range
+  [start finish step]
+  (when (t/before? start finish)
+    (lazy-seq
+     (cons start
+           (time-range
+            (t/plus- start (condp = step
+                             :day (t/days 1)
+                             :week (t/weeks 1)
+                             :month (t/months 1)
+                             :year (t/years 1)))
+            finish
+            step)))))
+
+(defn fill-range
+  [start finish step data]
+  (for [date (time-range (tcoerce/from-date start)
+                         (tcoerce/from-date finish)
+                         step)]
+    ;;TODO the filler should be by dimension definition
+    {date (or (get data date) 0)}))
