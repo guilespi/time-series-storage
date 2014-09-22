@@ -8,6 +8,12 @@
   (add-dimension! [service id options]
     "Adds a new dimension to the service database")
 
+  (facts [service]
+    "Retrieves all defined facts")
+
+  (dimensions [service]
+    "Retrieves all defined dimensions")
+
   (new-fact! [service id value categories]
              [service timestamp id value categories]
     "Notifies of new event occurred, generates event tracking

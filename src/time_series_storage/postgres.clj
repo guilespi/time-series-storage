@@ -28,6 +28,12 @@
                               (keyword id)
                               options))
 
+  (facts [service]
+    (schema/all-facts config))
+
+  (dimensions [service]
+    (schema/all-dimensions config))
+
   (new-fact! [service id value categories]
     (u/new-fact config
                 id
