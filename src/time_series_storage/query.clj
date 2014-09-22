@@ -32,7 +32,8 @@
                                            (t/month date)
                                            1
                                            0
-                                           0)))))
+                                           0))
+      :none :all)))
 
 ;;TODO: this should be done inside the library with knowledge about
 ;;the dimension type not here infering stuff
@@ -50,7 +51,8 @@
                          rows)]
      {k  (->> (group-by (partial time-dimension by) v)
               (map (fn [[k v]]
-                     {(tcoerce/from-string k) (reduce #(+ %1 (:counter %2)) 0 v)}))
+                     {(or (tcoerce/from-string k)
+                          k) (reduce #(+ %1 (:counter %2)) 0 v)}))
               (apply merge))})))
 
 
@@ -88,10 +90,12 @@
 
 (defn fill-range
   [start finish step data]
-  (apply merge
-         (for [[k series] data]
-           {k (for [date (time-range (tcoerce/from-date start)
-                                     (tcoerce/from-date finish)
-                                     step)]
-                ;;TODO the filler should be by dimension definition
-                {date (or (get series date) 0)})})))
+  (if (= :none step)
+    data
+    (apply merge
+           (for [[k series] data]
+             {k (for [date (time-range (tcoerce/from-date start)
+                                       (tcoerce/from-date finish)
+                                       step)]
+                  ;;TODO the filler should be by dimension definition
+                  {date (or (get series date) 0)})}))))
