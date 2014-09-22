@@ -27,10 +27,11 @@
 (defn all-dimensions
   "Returns all dimensions defined on the database"
   [db]
-  (j/query db
-            (sql
-             (select [*]
-               (from :dimensions)))))
+  (map #(update-in % [:grouped_by] read-string)
+       (j/query db
+                (sql
+                 (select [*]
+                         (from :dimensions))))))
 
 
 (defn get-dimensions
