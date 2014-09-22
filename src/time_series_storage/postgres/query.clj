@@ -8,8 +8,9 @@
   "Retrieves a time-ranged condition for a specific fact in
    a specific dimension path"
   [fact dimension filter-data start finish]
-  `(and ~@(for [[k v] (merge (select-keys filter-data (:grouped_by dimension))
-                             {(keyword (:id dimension)) (get filter-data (keyword (:id dimension)))})]
+  `(and ~@(for [[k v] (filter second ;;no emtpy vals
+                              (merge (select-keys filter-data (:grouped_by dimension))
+                                     {(keyword (:id dimension)) (get filter-data (keyword (:id dimension)))}))]
                 `(= ~k ~v))
         (>= :timestamp ~(get-slice (or (:slice dimension)
                                        (:slice fact)) start))

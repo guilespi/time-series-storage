@@ -45,21 +45,27 @@
 
 (defmethod collapse :counter
   [rows by]
-  (->> (group-by (partial time-dimension by) rows)
-       (map (fn [[k v]]
-              {(tcoerce/from-string k) (reduce #(+ %1 (:counter %2)) 0 v)}))
-       (apply merge)))
+  (apply merge
+   (for [[k v] (group-by #(select-keys % (keys (dissoc % :counter :timestamp)))
+                         rows)]
+     {k  (->> (group-by (partial time-dimension by) v)
+              (map (fn [[k v]]
+                     {(tcoerce/from-string k) (reduce #(+ %1 (:counter %2)) 0 v)}))
+              (apply merge))})))
 
 
 (defmethod collapse :average
   [rows by]
-  (->> (group-by (partial time-dimension by) rows)
-       (map (fn [[k v]]
-              {(tcoerce/from-string k) (reduce #(merge-with + %1 (select-keys %2 [:counter
-                                                                                  :total]))
-                                               {:counter 0
-                                                :total 0}
-                                               v)}))))
+  (apply merge
+         (for [[k v] (group-by #(select-keys % (keys (dissoc % :counter :timestamp :total)))
+                               rows)]
+           (->> (group-by (partial time-dimension by) v)
+                (map (fn [[k v]]
+                       {(tcoerce/from-string k) (reduce #(merge-with + %1 (select-keys %2 [:counter
+                                                                                           :total]))
+                                                        {:counter 0
+                                                         :total 0}
+                                                        v)}))))))
 
 (defmethod collapse :histogram
   [rows by]
@@ -82,8 +88,10 @@
 
 (defn fill-range
   [start finish step data]
-  (for [date (time-range (tcoerce/from-date start)
-                         (tcoerce/from-date finish)
-                         step)]
-    ;;TODO the filler should be by dimension definition
-    {date (or (get data date) 0)}))
+  (apply merge
+         (for [[k series] data]
+           {k (for [date (time-range (tcoerce/from-date start)
+                                     (tcoerce/from-date finish)
+                                     step)]
+                ;;TODO the filler should be by dimension definition
+                {date (or (get series date) 0)})})))
