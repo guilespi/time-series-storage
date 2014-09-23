@@ -94,8 +94,9 @@
     data
     (apply merge
            (for [[k series] data]
-             {k (for [date (time-range (tcoerce/from-date start)
-                                       (tcoerce/from-date finish)
-                                       step)]
-                  ;;TODO the filler should be by dimension definition
-                  {date (or (get series date) 0)})}))))
+             {k (apply merge
+                       (for [date (time-range (tcoerce/from-date start)
+                                              (tcoerce/from-date finish)
+                                              step)]
+                         ;;TODO the filler should be by dimension definition
+                         {(tcoerce/to-date date) (or (get series date) 0)}))}))))
