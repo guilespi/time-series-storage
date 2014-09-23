@@ -74,6 +74,10 @@
   (throw (Exception. "histogram collapsing not yet ready")))
 
 
+(defmethod collapse :default
+  [rows by]
+  {})
+
 (defn time-range
   [start finish step]
   (when (t/before? start finish)
