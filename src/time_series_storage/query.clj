@@ -42,7 +42,7 @@
                       (and (:counter r)
                            (:total r)) :average
                       (:counter r) :counter
-                      :else (throw (Exception. "Unknown row type to collapse")))))
+                      :else :default)))
 
 (defmethod collapse :counter
   [rows by]
@@ -58,6 +58,7 @@
 
 (defmethod collapse :average
   [rows by]
+
   (apply merge
          (for [[k v] (group-by #(select-keys % (keys (dissoc % :counter :timestamp :total)))
                                rows)]
