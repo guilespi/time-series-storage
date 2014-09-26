@@ -9,13 +9,19 @@
 (defn event-key
   "Returns the particular key for updating a fact in a specific dimension.
   This WILL consider timestamp as one of the default key columns, and WILL calculate
-  the bucket according to time."
+  the bucket according to time.
+
+  If some required value for the key is not present in the event, nil is returned."
   [fact dimension group event datetime]
-  (merge (select-keys event group)
-         {(keyword (:id dimension)) (get event (keyword (:id dimension)))
-          :timestamp (get-slice (or (:slice dimension)
-                                    (:slice fact))
-                                datetime)}))
+  (when (= (set group)
+           (-> (select-keys event group)
+               keys
+               set))
+      (merge (select-keys event group)
+             {(keyword (:id dimension)) (get event (keyword (:id dimension)))
+              :timestamp (get-slice (or (:slice dimension)
+                                        (:slice fact))
+                                    datetime)})))
 
 (defn expand-condition
   "Given a map of key-values creates a condition assuming equality
@@ -34,35 +40,39 @@
   ;;Makes a statement for upserting counters on a specific fact and
   ;;dimension hierarchy
   [fact dimension event date-time]
-  (for [group (:grouped_by dimension)]
-    (let [table-name (->> (conj group (:id dimension))
-                          (make-table-name fact))
-          key (event-key fact dimension group event date-time)]
-      (with [:upsert (update table-name '((= counter counter+1))
-                             (where (expand-condition key))
-                             (returning *))]
-            (insert table-name (conj (keys key) :counter)
-                    (select (conj (vals key) 1))
-                    (where `(not-exists ~(select [*] (from :upsert)))))))))
+  ;;some groupings may not generate upserts when data is missing
+  (filter identity
+          (for [group (:grouped_by dimension)]
+            (let [table-name (->> (conj group (:id dimension))
+                                  (make-table-name fact))]
+              (when-let [key (event-key fact dimension group event date-time)]
+                (with [:upsert (update table-name '((= counter counter+1))
+                                       (where (expand-condition key))
+                                       (returning *))]
+                      (insert table-name (conj (keys key) :counter)
+                              (select (conj (vals key) 1))
+                              (where `(not-exists ~(select [*] (from :upsert)))))))))))
 
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
   ;;dimension hierarchy
   [fact dimension event date-time]
-  (for [group (:grouped_by dimension)]
-    (let [table-name (->> (conj group (:id dimension))
-                          (make-table-name fact))
-          key (event-key fact dimension group event date-time)
-          value (get event (keyword (:id fact)))]
-      (with [:upsert (update table-name (conj '()
-                                              '(= counter counter+1)
-                                              (concat '(= total)
-                                                      [(symbol (str "total+" value))]))
-                             (where (expand-condition key))
-                             (returning *))]
-            (insert table-name (concat (keys key) [:counter :total])
-                    (select (conj (vec (vals key)) 1 value))
-                    (where `(not-exists ~(select [*] (from :upsert)))))))))
+  ;;some groupings may not generate upserts when data is missing
+  (filter identity
+          (for [group (:grouped_by dimension)]
+            (let [table-name (->> (conj group (:id dimension))
+                                  (make-table-name fact))
+                  value (get event (keyword (:id fact)))]
+              (when-let [key (event-key fact dimension group event date-time)]
+                (with [:upsert (update table-name (conj '()
+                                                        '(= counter counter+1)
+                                                        (concat '(= total)
+                                                                [(symbol (str "total+" value))]))
+                                       (where (expand-condition key))
+                                       (returning *))]
+                      (insert table-name (concat (keys key) [:counter :total])
+                              (select (conj (vec (vals key)) 1 value))
+                              (where `(not-exists ~(select [*] (from :upsert)))))))))))
 
 (defn new-fact
   "When a new fact occurs update all the corresponding dimensions specified in the fact
