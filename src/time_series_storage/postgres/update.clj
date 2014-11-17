@@ -78,7 +78,7 @@
   "When a new fact occurs update all the corresponding dimensions specified in the fact
    categories. If some category is not updatable the complete fact fails (this is in
    order to avoid counter mismatches)"
-  [db timestamp id value categories]
+  [db id timestamp value categories]
   (if (some nil? (vals categories))
     (throw (Exception. "Some categories have nil values"))
     (if-let [fact (schema/get-fact db id)]

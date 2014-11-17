@@ -40,25 +40,28 @@
 
   (new-fact! [service id value categories]
     (api/new-fact! config
-               (t/now)
                id
+               (t/now)
                value
                categories))
 
-  (new-fact! [service timestamp id value categories]
+  (new-fact! [service id timestamp value categories]
     (u/new-fact config
-                (tcoerce/from-date timestamp)
                 id
+                (tcoerce/from-date timestamp)
                 value
                 categories))
 
   (inc! [service id categories]
-    (api/inc! service (t/now) id categories))
+    (api/inc! service
+              id
+              (t/now)
+              categories))
 
-  (inc! [service timestamp id categories]
+  (inc! [service id timestamp categories]
     (u/new-fact config
-                (tcoerce/from-date timestamp)
                 id
+                (tcoerce/from-date timestamp)
                 1
                 categories))
 
