@@ -33,5 +33,8 @@
     "Retrieves a single row histogram for the fact, if merge-with
      not specified histogram time-series is merged with +")
 
+  (drop-schema! [service]
+    "Drops the schema")
+
   (init-schema! [service]
     "Initializes schema"))

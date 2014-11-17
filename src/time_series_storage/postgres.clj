@@ -16,6 +16,10 @@
     (schema/create-facts-table! config)
     (schema/create-dimensions-table! config))
 
+  (drop-schema! [service]
+    (schema/drop-facts-table! config)
+    (schema/drop-dimensions-table! config))
+
   (add-fact! [service id type slice options]
     (schema/create-fact! config
                          (keyword id)
