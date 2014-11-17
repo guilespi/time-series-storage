@@ -20,7 +20,7 @@
      information for the fact on all the specified categories")
 
   (inc! [service id categories]
-        [service id timestamp categories]
+        [service timestamp id categories]
     "Notifies of new counter event occurred and increments
      its value in all the specified categories")
 

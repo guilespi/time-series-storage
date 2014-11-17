@@ -35,30 +35,26 @@
     (schema/all-dimensions config))
 
   (new-fact! [service id value categories]
-    (u/new-fact config
-                id
-                (t/now)
-                value
-                categories))
+    (api/new-fact! config
+               (t/now)
+               id
+               value
+               categories))
 
   (new-fact! [service timestamp id value categories]
     (u/new-fact config
-                id
                 (tcoerce/from-date timestamp)
+                id
                 value
                 categories))
 
   (inc! [service id categories]
-    (u/new-fact config
-                id
-                (t/now)
-                1
-                categories))
+    (api/inc! service (t/now) id categories))
 
-  (inc! [service id timestamp categories]
+  (inc! [service timestamp id categories]
     (u/new-fact config
-                id
                 (tcoerce/from-date timestamp)
+                id
                 1
                 categories))
 
