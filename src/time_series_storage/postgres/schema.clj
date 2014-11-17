@@ -79,7 +79,8 @@
   [db]
   (j/execute! db
     (sql
-      (drop-table [:facts]))))
+      (drop-table [:facts]
+        (if-exists true)))))
 
 (defn create-dimensions-table!
   [db]
@@ -97,7 +98,8 @@
   [db]
   (j/execute! db
     (sql
-      (drop-table [:dimensions]))))
+      (drop-table [:dimensions]
+        (if-exists true)))))
 
 (defn create-fact!
   "Inserts the new fact to the database"
