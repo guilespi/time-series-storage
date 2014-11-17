@@ -9,15 +9,17 @@
 
 (def service (Postgres. db-spec))
 
-(defn init-schema [service]
+(defn init-schema-fixture [f]
   (t/drop-schema! service)
   (t/init-schema! service)
+  (f)
   )
 
-(deftest postgres-time-series
+(use-fixtures :each init-schema-fixture)
+
+(deftest add-fact
   (testing "add-fact"
 
-    (init-schema service)
     (t/add-fact! service :signups :counter 10 {})
 
     (is (= [{:type "counter"
@@ -27,63 +29,57 @@
                 t/facts
                 (map #(select-keys % [:type
                                       :id
-                                      :slice])))
-           ))
+                                      :slice])))))
 
-    )
+    ))
 
-  (testing "add-fact with options"
+(deftest add-fact-with-options
 
-    (init-schema service)
-    (t/add-fact! service :time-distr :histogram 15 {:name "Time histogram"
-                                                    :filler 0
-                                                    :units "seconds"
-                                                    :start 0
-                                                    :end 1000
-                                                    :step 100} )
+  (t/add-fact! service :time-distr :histogram 15 {:name "Time histogram"
+                                                  :filler 0
+                                                  :units "seconds"
+                                                  :start 0
+                                                  :end 1000
+                                                  :step 100} )
 
-    (is (= [{:type "histogram"
-             :id "time-distr"
-             :slice 15
-             :name "Time histogram"
-             :filler 0
-             :units "seconds"
-             :start 0
-             :end 1000
-             :step 100}]
-           (->> service
-                t/facts
-                (map #(select-keys % [:type
-                                      :id
-                                      :slice
-                                      :name
-                                      :filler
-                                      :units
-                                      :start
-                                      :end
-                                      :step])))
-           ))
+  (is (= [{:type "histogram"
+           :id "time-distr"
+           :slice 15
+           :name "Time histogram"
+           :filler 0
+           :units "seconds"
+           :start 0
+           :end 1000
+           :step 100}]
+         (->> service
+              t/facts
+              (map #(select-keys % [:type
+                                    :id
+                                    :slice
+                                    :name
+                                    :filler
+                                    :units
+                                    :start
+                                    :end
+                                    :step])))
+         ))
+
+  )
 
 
-    )
+(deftest add-dimension
 
-  (testing "dimension"
+  (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/add-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
+  (t/add-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
 
-    (init-schema service)
-    (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
-    (t/add-dimension! service :campaign {:grouped_by [:company]           :name "Campania"})
-    (t/add-dimension! service :channel  {:grouped_by [:company :campaign] :name "Canal"})
-
-    (is (= [{:id "company"  :name "Compania" :group_only true  :grouped_by [[]]}
-            {:id "campaign" :name "Campania" :group_only false :grouped_by [:company]}
-            {:id "channel"  :name "Canal"    :group_only false :grouped_by [:company :campaign]}]
-           (->> service
-                t/dimensions
-                (map #(select-keys % [:name
-                                      :id
-                                      :grouped_by
-                                      :group_only])))))
-
-    )
-
+  (is (= [{:id "company"  :name "Compania" :group_only true  :grouped_by [[]]}
+          {:id "campaign" :name "Campania" :group_only false :grouped_by [[:company]]}
+          {:id "channel"  :name "Canal"    :group_only false :grouped_by [[:company :campaign]]}]
+         (->> service
+              t/dimensions
+              (map #(select-keys % [:name
+                                    :id
+                                    :grouped_by
+                                    :group_only])))))
   )
