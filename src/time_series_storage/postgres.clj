@@ -16,6 +16,10 @@
     (schema/create-facts-table! config)
     (schema/create-dimensions-table! config))
 
+  (drop-schema! [service]
+    (schema/drop-facts-table! config)
+    (schema/drop-dimensions-table! config))
+
   (add-fact! [service id type slice options]
     (schema/create-fact! config
                          (keyword id)
@@ -35,13 +39,13 @@
     (schema/all-dimensions config))
 
   (new-fact! [service id value categories]
-    (u/new-fact config
-                id
-                (t/now)
-                value
-                categories))
+    (api/new-fact! config
+                   id
+                   (t/now)
+                   value
+                   categories))
 
-  (new-fact! [service timestamp id value categories]
+  (new-fact! [service id timestamp value categories]
     (u/new-fact config
                 id
                 (tcoerce/from-date timestamp)
@@ -49,11 +53,10 @@
                 categories))
 
   (inc! [service id categories]
-    (u/new-fact config
-                id
-                (t/now)
-                1
-                categories))
+    (api/inc! service
+              id
+              (t/now)
+              categories))
 
   (inc! [service id timestamp categories]
     (u/new-fact config

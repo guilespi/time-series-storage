@@ -75,6 +75,12 @@
        (column :end :integer)
        (column :step :integer)))))
 
+(defn drop-facts-table!
+  [db]
+  (j/execute! db
+    (sql
+      (drop-table [:facts]))))
+
 (defn create-dimensions-table!
   [db]
   (j/execute! db
@@ -87,6 +93,11 @@
        (column :group_only :boolean :default 'FALSE)
        (column :grouped_by :varchar :length 300)))))
 
+(defn drop-dimensions-table!
+  [db]
+  (j/execute! db
+    (sql
+      (drop-table [:dimensions]))))
 
 (defn create-fact!
   "Inserts the new fact to the database"

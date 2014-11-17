@@ -15,7 +15,7 @@
     "Retrieves all defined dimensions")
 
   (new-fact! [service id value categories]
-             [service timestamp id value categories]
+             [service id timestamp value categories]
     "Notifies of new event occurred, generates event tracking
      information for the fact on all the specified categories")
 
@@ -32,6 +32,9 @@
                  [service fact dimension query-data start finish merge-with]
     "Retrieves a single row histogram for the fact, if merge-with
      not specified histogram time-series is merged with +")
+
+  (drop-schema! [service]
+    "Drops the schema")
 
   (init-schema! [service]
     "Initializes schema"))
