@@ -39,9 +39,9 @@
     (schema/all-dimensions config))
 
   (new-fact! [service id value categories]
-    (api/new-fact! config
+    (api/new-fact! service
                    id
-                   (t/now)
+                   (java.util.Date.)
                    value
                    categories))
 
@@ -55,7 +55,7 @@
   (inc! [service id categories]
     (api/inc! service
               id
-              (t/now)
+              (java.util.Date.)
               categories))
 
   (inc! [service id timestamp categories]
