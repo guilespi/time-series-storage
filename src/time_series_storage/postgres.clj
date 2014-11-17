@@ -40,10 +40,10 @@
 
   (new-fact! [service id value categories]
     (api/new-fact! config
-               id
-               (t/now)
-               value
-               categories))
+                   id
+                   (t/now)
+                   value
+                   categories))
 
   (new-fact! [service id timestamp value categories]
     (u/new-fact config
