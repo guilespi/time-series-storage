@@ -16,6 +16,12 @@
                (from :facts)
                (where `(= :id ~(name fact))))))))
 
+(defn get-fact!
+  "Retrieves a fact definition from database, throws if fact does not exists"
+  [db fact]
+  (or
+    (get-fact db fact)
+    (throw (Exception. (format "Fact %s is not defined" id)))))
 (defn all-facts
   "Returns all facts defined on the database"
   [db]
@@ -35,8 +41,7 @@
 
 
 (defn get-dimensions
-  "Receives a sequence of dimensions and validates all exist, returning
-   a map of definitions keyed by dimension"
+  "Finds the dimensions given by s. Returns a map of definitions keyed by dimension"
   [db s]
   (let [dims (seq (j/query db
                            (sql (select [*]
@@ -44,9 +49,21 @@
                                   (where `(in :id ~(map #(name %) s)))))))
         defs (reduce #(assoc %1 (keyword (:id %2)) (update-in %2 [:grouped_by] read-string))
                      {} dims)]
+    defs))
+
+(defn all-dimensions-exist?
+  [dims dims-definitions]
+  (= (set s) (set (keys defs))))
+
+(defn get-dimensions!
+  "Receives a sequence of dimensions and validates all exist, returning
+   a map of definitions keyed by dimension"
+  [db s]
+  (let [defs (get-dimensions db s)]
     ;;if keys do not match some dimension does not exist
-    (when (= (set s) (set (keys defs)))
-      defs)))
+    (when-not (all-dimensions-exist? s defs)
+      (throw (Exception. "Some specified dimensions do not exist")))
+    defs))
 
 (defn get-dimension
   "Retrieves a specific dimensions given its identifier, supports keyworded
@@ -182,7 +199,7 @@
             (when (not (:group_only opts))
               (for [fact facts
                     group grouped-by]
-                (if (get-dimensions db group)
+                (if (all-dimensions-exist? group (get-dimensions db group))
                   (make-time-series-table fact (conj group id))
                   (throw (Exception. (format "Some specified dimensions to group-by do not exist on:" group)))))))]
     (j/with-db-transaction [t db]

@@ -79,18 +79,20 @@
    categories. If some category is not updatable the complete fact fails (this is in
    order to avoid counter mismatches)"
   [db id timestamp value categories]
-  (if (some nil? (vals categories))
-    (throw (Exception. "Some categories have nil values"))
-    (if-let [fact (schema/get-fact db id)]
-      ;;TODO:this should be cached on key set!
-      (if-let [dims (schema/get-dimensions db (keys categories))]
-        ;;for each dimension definition update fact in properly grouped tables
-        (let [tx (apply concat
-                        (for [d (filter #(not (:group_only %)) (vals dims))]
-                          (make-dimension-fact fact d (merge categories {id value}) timestamp)))]
-          (j/with-db-transaction [t db]
-            (doseq [st tx]
-              (j/execute! t
-                          (sql st)))))
-        (throw (Exception. "Some specified dimensions do not exist")))
-      (throw (Exception. (format "Fact %s is not defined" id))))))
+  (when (some nil? (vals categories))
+    (throw (Exception. "Some categories have nil values")))
+  (let [fact (schema/get-fact! db id)
+        ;;TODO:this should be cached on key set!
+        dims (schema/get-dimensions! db (keys categories))]
+    ;;for each dimension definition update fact in properly grouped tables
+    (let [event (merge categories {id value})
+          tx (->> dims
+                  vals
+                  (filter #(not (:group_only %)))
+                  (map #(make-dimension-fact fact % event timestamp))
+                  (apply concat))]
+      (j/with-db-transaction [t db]
+        (doseq [st tx]
+          (j/execute! t
+                      (sql st)))))
+    ))
