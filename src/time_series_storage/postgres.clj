@@ -35,6 +35,9 @@
   (facts [service]
     (schema/all-facts config))
 
+  (fact [service fact-id]
+    (schema/get-fact config fact-id))
+
   (dimensions [service]
     (schema/all-dimensions config))
 
@@ -59,18 +62,18 @@
                     categories
                     dims)
         (throw (Exception. "Some specified categories do not exist")))
-      (throw (Exception. (format "Fact %s is not defined" id))))
+      (throw (Exception. (format "Fact %s is not defined" fact-id))))
     )
 
-  (inc! [service id categories]
+  (inc! [service fact-id categories]
     (api/inc! service
-              id
+              fact-id
               (java.util.Date.)
               categories))
 
-  (inc! [service id timestamp categories]
+  (inc! [service fact-id timestamp categories]
     (u/new-fact config
-                id
+                fact-id
                 (tcoerce/from-date timestamp)
                 1
                 categories))

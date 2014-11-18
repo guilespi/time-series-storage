@@ -11,6 +11,9 @@
   (facts [service]
     "Retrieves all defined facts")
 
+  (fact [service fact-id]
+    "Retrieves a fact given its id")
+
   (dimensions [service]
     "Retrieves all defined dimensions")
 
