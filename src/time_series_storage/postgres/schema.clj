@@ -170,6 +170,13 @@
       [nil (create-fact-column stmt fact)])
     ))
 
+(defn- execute-with-transaction
+  [db tx]
+  (j/with-db-transaction [t db]
+    (doseq [st tx]
+      (j/execute! t
+                  (sql st)))))
+
 (defn create-dimension!
   "In a transaction, creates the dimension register and all the
    tables needed to keep track of all the configured faacts up to
@@ -182,7 +189,4 @@
                                    group grouped-by]
                                (make-time-series-table fact (conj group id))))
         tx (conj time-series-tables (make-dimension id opts))]
-    (j/with-db-transaction [t db]
-      (doseq [st tx]
-        (j/execute! t
-                    (sql st))))))
+    (execute-with-transaction db tx)))
