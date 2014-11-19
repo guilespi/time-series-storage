@@ -28,6 +28,11 @@
                          options))
 
   (add-dimension! [service id options]
+    (when-let [grouped-by (:grouped_by options)]
+      (doseq [group grouped-by]
+        (when-not (schema/get-dimensions config group)
+          (throw (Exception. (format "Some specified dimensions to group-by do not exist on:" group))))))
+
     (schema/create-dimension! config
                               (keyword id)
                               options))

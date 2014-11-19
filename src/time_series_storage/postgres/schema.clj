@@ -170,6 +170,13 @@
       [nil (create-fact-column stmt fact)])
     ))
 
+(defn- execute-with-transaction!
+  [db tx]
+  (j/with-db-transaction [t db]
+    (doseq [st tx]
+      (j/execute! t
+                  (sql st)))))
+
 (defn create-dimension!
   "In a transaction, creates the dimension register and all the
    tables needed to keep track of all the configured faacts up to
@@ -177,15 +184,9 @@
   [db id opts]
   (let [facts (all-facts db)
         grouped-by (or (:grouped_by opts) [[]])
-        tx (concat
-            [(make-dimension id opts)]
-            (when (not (:group_only opts))
-              (for [fact facts
-                    group grouped-by]
-                (if (get-dimensions db group)
-                  (make-time-series-table fact (conj group id))
-                  (throw (Exception. (format "Some specified dimensions to group-by do not exist on:" group)))))))]
-    (j/with-db-transaction [t db]
-                (doseq [st tx]
-                  (j/execute! t
-                              (sql st))))))
+        time-series-tables (when-not (:group_only opts)
+                             (for [fact facts
+                                   group grouped-by]
+                               (make-time-series-table fact (conj group id))))
+        tx (conj time-series-tables (make-dimension id opts))]
+    (execute-with-transaction! db tx)))
