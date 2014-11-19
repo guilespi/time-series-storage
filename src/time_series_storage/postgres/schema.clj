@@ -170,6 +170,25 @@
       [nil (create-fact-column stmt fact)])
     ))
 
+(defn drop-time-series-table-stm
+  [fact {dim-id :id grouped-by :grouped_by}]
+  (->> grouped-by
+       (map #(conj % dim-id))
+       (map #(make-table-name fact %))
+       (map #(drop-table [%]
+                         (if-exists true)))))
+
+(defn drop-fact-time-series-tables!
+  [db fact dims]
+  (let [dims (filter (complement :group_only) dims)
+        tx (->> dims
+                (map #(drop-time-series-table-stm fact %))
+                (apply concat))]
+    (j/with-db-transaction [t db]
+      (doseq [st tx]
+        (j/execute! t
+                    (sql st))))))
+
 (defn- execute-with-transaction!
   [db tx]
   (j/with-db-transaction [t db]
@@ -179,8 +198,8 @@
 
 (defn create-dimension!
   "In a transaction, creates the dimension register and all the
-   tables needed to keep track of all the configured faacts up to
-   the moment"
+  tables needed to keep track of all the configured faacts up to
+  the moment"
   [db id opts]
   (let [facts (all-facts db)
         grouped-by (or (:grouped_by opts) [[]])

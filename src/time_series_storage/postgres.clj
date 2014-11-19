@@ -17,6 +17,9 @@
     (schema/create-dimensions-table! config))
 
   (drop-schema! [service]
+    (let [dims (api/dimensions service)]
+      (doseq [fact (api/facts service)]
+        (schema/drop-fact-time-series-tables! config fact dims)))
     (schema/drop-facts-table! config)
     (schema/drop-dimensions-table! config))
 

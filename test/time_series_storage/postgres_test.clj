@@ -1,7 +1,10 @@
 (ns time-series-storage.postgres-test
   (:use [clojure.test])
   (:require [time-series-storage.postgres :as p]
-            [time-series-storage.api :as t])
+            [time-series-storage.api :as t]
+            [time-series-storage.postgres.schema :as schema]
+            [clojure.java.jdbc :as j]
+            [sqlingvo.core :as sql])
   (:import [time_series_storage.postgres Postgres]))
 
 (def db-spec (or (System/getenv "DATABASE_URL")
@@ -10,7 +13,9 @@
 (def service (Postgres. db-spec))
 
 (defn init-schema-fixture [f]
-  (t/drop-schema! service)
+  (try
+    (t/drop-schema! service)
+    (catch Exception e))
   (t/init-schema! service)
   (f)
   )
@@ -18,7 +23,6 @@
 (use-fixtures :each init-schema-fixture)
 
 (deftest add-fact
-  (testing "add-fact"
 
     (t/add-fact! service :signups :counter 10 {})
 
@@ -29,9 +33,7 @@
                 t/facts
                 (map #(select-keys % [:type
                                       :id
-                                      :slice])))))
-
-    ))
+                                      :slice]))))))
 
 (deftest add-fact-with-options
 
@@ -83,3 +85,43 @@
                                     :grouped_by
                                     :group_only])))))
   )
+
+(defn find-table-names
+  [db]
+  (let [query (sql/sql
+                (sql/select [:table_name]
+                            (sql/from :information_schema.tables)
+                            (sql/where '(= :table_schema "public"))))]
+    (->> query
+         (j/query db-spec)
+         (map :table_name))))
+
+(deftest drop-schema
+  (t/add-fact! service :signups :counter 10 {})
+  (t/add-fact! service :conversions  :counter 10 {})
+
+  (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/add-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
+  (t/add-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+
+  (t/drop-schema! service)
+  (is (= [] (find-table-names db-spec))))
+
+
+(deftest drop-schema-keeps-other-tables
+  (j/execute! db-spec
+              (sql/sql (sql/create-table :random_table_name
+                                         (sql/if-not-exists true))))
+  (t/add-fact! service :signups :counter 10 {})
+  (t/add-fact! service :conversions  :counter 10 {})
+
+  (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/add-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
+  (t/add-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+
+  (t/drop-schema! service)
+
+  (is (= ["random_table_name"] (find-table-names db-spec)))
+
+  (j/execute! db-spec
+              (sql/sql (sql/drop-table [:random_table_name]))))
