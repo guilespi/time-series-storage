@@ -28,7 +28,6 @@
                          options))
 
   (add-dimension! [service id options]
-    {:pre [(or (:group_only options) (:grouped_by options))]}
     (when-let [grouped-by (:grouped_by options)]
       (doseq [group grouped-by]
         (when-not (schema/get-dimensions config group)
