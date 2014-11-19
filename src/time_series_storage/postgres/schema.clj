@@ -170,7 +170,7 @@
       [nil (create-fact-column stmt fact)])
     ))
 
-(defn- execute-with-transaction
+(defn- execute-with-transaction!
   [db tx]
   (j/with-db-transaction [t db]
     (doseq [st tx]
@@ -189,4 +189,4 @@
                                    group grouped-by]
                                (make-time-series-table fact (conj group id))))
         tx (conj time-series-tables (make-dimension id opts))]
-    (execute-with-transaction db tx)))
+    (execute-with-transaction! db tx)))
