@@ -80,7 +80,7 @@
   "When a new fact occurs update all the corresponding dimensions specified in the fact
    categories. If some category is not updatable the complete fact fails (this is in
    order to avoid counter mismatches)"
-  [db {:keys [fact-id] :as fact} timestamp value categories dims]
+  [db {fact-id :id :as fact} timestamp value categories dims]
   (let [event (merge categories {fact-id value})
         tx (->> (vals dims)
                 (filter #(not (:group_only %)))
