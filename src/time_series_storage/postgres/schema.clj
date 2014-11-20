@@ -184,17 +184,7 @@
         tx (->> dims
                 (map #(drop-time-series-table-stm fact %))
                 (apply concat))]
-    (j/with-db-transaction [t db]
-      (doseq [st tx]
-        (j/execute! t
-                    (sql st))))))
-
-(defn- execute-with-transaction!
-  [db tx]
-  (j/with-db-transaction [t db]
-    (doseq [st tx]
-      (j/execute! t
-                  (sql st)))))
+    (execute-with-transaction! db (map sql tx))))
 
 (defn create-dimension!
   "In a transaction, creates the dimension register and all the
@@ -208,4 +198,4 @@
                                    group grouped-by]
                                (make-time-series-table fact (conj group id))))
         tx (conj time-series-tables (make-dimension id opts))]
-    (execute-with-transaction! db tx)))
+    (execute-with-transaction! db (map sql tx))))
