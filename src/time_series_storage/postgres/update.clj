@@ -44,13 +44,15 @@
   (filter identity
           (for [group (:grouped_by dimension)]
             (let [table-name (->> (conj group (:id dimension))
-                                  (make-table-name fact))]
+                                  (make-table-name fact))
+                  value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (with [:upsert (update table-name '((= counter counter+1))
+                (with [:upsert (update table-name `((:= ~'counter
+                                                        ~(symbol (str "counter+" value))))
                                        (where (expand-condition key))
                                        (returning *))]
                       (insert table-name (conj (keys key) :counter)
-                              (select (conj (vals key) 1))
+                              (select (conj (vals key) value))
                               (where `(not-exists ~(select [*] (from :upsert)))))))))))
 
 (defmethod make-dimension-fact :average
