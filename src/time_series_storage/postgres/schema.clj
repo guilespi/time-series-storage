@@ -178,13 +178,12 @@
        (map #(drop-table [%]
                          (if-exists true)))))
 
-(defn drop-fact-time-series-tables!
+(defn drop-fact-time-series-stmts
   [db fact dims]
-  (let [dims (filter (complement :group_only) dims)
-        tx (->> dims
-                (map #(drop-time-series-table-stm fact %))
-                (apply concat))]
-    (execute-with-transaction! db (map sql tx))))
+  (->> (filter (complement :group_only) dims)
+       (map #(drop-time-series-table-stm fact %))
+       (apply concat)
+       (map sql)))
 
 (defn create-dimension!
   "In a transaction, creates the dimension register and all the

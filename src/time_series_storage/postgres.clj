@@ -4,6 +4,7 @@
             [time-series-storage.postgres.schema :as schema]
             [time-series-storage.postgres.query :as q]
             [time-series-storage.postgres.update :as u]
+            [time-series-storage.postgres.common :as pc]
             [clj-time.core :as t]
             [clj-time.coerce :as tcoerce])
   (:use [time-series-storage.query]))
@@ -17,9 +18,12 @@
     (schema/create-dimensions-table! config))
 
   (drop-schema! [service]
-    (let [dims (api/dimensions service)]
-      (doseq [fact (api/facts service)]
-        (schema/drop-fact-time-series-tables! config fact dims)))
+    ;; TODO: run all as a unique transaction
+    (let [dims (api/dimensions service)
+          tx (->> (api/facts service)
+                  (map #(schema/drop-fact-time-series-stmts config % dims))
+                  (apply concat))]
+      (pc/execute-with-transaction! config tx))
     (schema/drop-facts-table! config)
     (schema/drop-dimensions-table! config))
 
