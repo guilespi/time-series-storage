@@ -170,7 +170,7 @@
       [nil (create-fact-column stmt fact)])
     ))
 
-(defn drop-time-series-table-stm
+(defn- drop-time-series-table-stm
   [fact {dim-id :id grouped-by :grouped_by}]
   (->> grouped-by
        (map #(conj % dim-id))
@@ -178,23 +178,19 @@
        (map #(drop-table [%]
                          (if-exists true)))))
 
-(defn drop-fact-time-series-tables!
-  [db fact dims]
-  (let [dims (filter (complement :group_only) dims)
-        tx (->> dims
-                (map #(drop-time-series-table-stm fact %))
-                (apply concat))]
-    (j/with-db-transaction [t db]
-      (doseq [st tx]
-        (j/execute! t
-                    (sql st))))))
+(defn- drop-fact-time-series-stmts
+  [fact dims]
+  (->> (filter (complement :group_only) dims)
+       (map #(drop-time-series-table-stm fact %))
+       (apply concat)))
 
-(defn- execute-with-transaction!
-  [db tx]
-  (j/with-db-transaction [t db]
-    (doseq [st tx]
-      (j/execute! t
-                  (sql st)))))
+(defn drop-facts-time-series-tables!
+  [db]
+  (let [dims (all-dimensions db)
+        tx (->> (all-facts db)
+                (map #(drop-fact-time-series-stmts % dims))
+                (apply concat))]
+    (execute-with-transaction! db (map sql tx))))
 
 (defn create-dimension!
   "In a transaction, creates the dimension register and all the
@@ -208,4 +204,4 @@
                                    group grouped-by]
                                (make-time-series-table fact (conj group id))))
         tx (conj time-series-tables (make-dimension id opts))]
-    (execute-with-transaction! db tx)))
+    (execute-with-transaction! db (map sql tx))))

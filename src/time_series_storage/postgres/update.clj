@@ -80,12 +80,8 @@
    order to avoid counter mismatches)"
   [db {:keys [fact-id] :as fact} timestamp value categories dims]
   (let [event (merge categories {fact-id value})
-        tx (->> dims
-                vals
+        tx (->> (vals dims)
                 (filter #(not (:group_only %)))
                 (map #(make-dimension-fact fact % event timestamp))
                 (apply concat))]
-    (j/with-db-transaction [t db]
-      (doseq [st tx]
-        (j/execute! t
-                    (sql st))))))
+    (execute-with-transaction! db (map sql tx))))
