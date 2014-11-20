@@ -4,7 +4,8 @@
             [time-series-storage.api :as t]
             [time-series-storage.postgres.schema :as schema]
             [clojure.java.jdbc :as j]
-            [sqlingvo.core :as sql])
+            [sqlingvo.core :as sql]
+            [clj-time.coerce :as tcoerce])
   (:import [time_series_storage.postgres Postgres]))
 
 (def db-spec (or (System/getenv "DATABASE_URL")
@@ -84,6 +85,45 @@
                                     :id
                                     :grouped_by
                                     :group_only])))))
+    )
+
+
+(deftest new-fact-and-get-timeseries
+
+  (t/add-fact! service :signups :counter 10 {:name "Cantidad de registros"
+                                             :filler 0
+                                             :units "counter"})
+
+  (t/add-dimension! service :dependency {:name "Dependencia de Correo"})
+  (t/add-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"})
+
+  (t/new-fact! service :signups 1 {:dependency "32" :dependency_user "pepe"})
+  (t/new-fact! service :signups #inst "2014-03-21" 1 {:dependency "31" :dependency_user "juanele"})
+
+  (let [timeseries (t/get-timeseries service
+                                     :signups
+                                     :dependency_user
+                                     {:dependency "31"}
+                                     #inst "2012-01-01"
+                                     #inst "2020-01-01")]
+    (is (= [{:dependency_user "juanele" :counter 1 :dependency "31"}]
+           (map #(select-keys % [:dependency_user :dependency :counter])
+                timeseries)))
+    (is (= (tcoerce/from-string "2014-03-21")
+           (tcoerce/from-string (:timestamp (first timeseries))))))
+
+  (let [timeseries (t/get-timeseries service
+                           :signups
+                           :dependency_user
+                           {:dependency nil}
+                           #inst "2012-01-01"
+                           #inst "2020-01-01")]
+    (is (= [{:dependency_user "juanele" :counter 1 :dependency "31"}
+            {:dependency_user "pepe"    :counter 1 :dependency "32"}]
+           (map #(select-keys % [:dependency_user :dependency :counter])
+                timeseries)))
+    (is (= (tcoerce/from-string "2014-03-21")
+           (-> (first timeseries) :timestamp tcoerce/from-string))))
   )
 
 (defn find-table-names
