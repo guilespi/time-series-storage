@@ -7,15 +7,11 @@
 (defn- range-where
   "Retrieves a time-ranged condition for a specific fact in
    a specific dimension path"
-  [fact dimension filter-data start finish]
-  `(and ~@(for [[k v] (filter second ;;no emtpy vals
-                              (merge (select-keys filter-data (:grouped_by dimension))
-                                     {(keyword (:id dimension)) (get filter-data (keyword (:id dimension)))}))]
+  [slice filter-data start finish]
+  `(and ~@(for [[k v] filter-data]
                 `(= ~k ~v))
-        (>= :timestamp ~(get-slice (or (:slice dimension)
-                                       (:slice fact)) start))
-        (<= :timestamp ~(get-slice (or (:slice dimension)
-                                       (:slice fact)) finish))))
+        (>= :timestamp ~(get-slice slice start))
+        (<= :timestamp ~(get-slice slice finish))))
 
 (defn- best-grouping
   [groupings data]
@@ -26,10 +22,15 @@
 (defn query
   "Retrieves a particular range of values for the specified fact and dimension."
   [db fact dimension filter-data start finish]
-  (let [table-name (->> (conj (best-grouping (:grouped_by dimension) filter-data)
-                              (:id dimension))
-                        (make-table-name fact))
-        condition (range-where fact dimension filter-data start finish)]
+  (let [grouping (conj (best-grouping (:grouped_by dimension) filter-data)
+                       (keyword (:id dimension)))
+        table-name (make-table-name fact grouping)
+        slice (or (:slice dimension) (:slice fact))
+        condition (range-where slice
+                               (->> (select-keys filter-data grouping)
+                                    (filter second))
+                               start
+                               finish)]
     (j/query db
       (sql
        (select [*]
