@@ -23,9 +23,9 @@
 
 (use-fixtures :each init-schema-fixture)
 
-(deftest add-fact
+(deftest define-fact
 
-    (t/add-fact! service :signups :counter 10 {})
+    (t/define-fact! service :signups :counter 10 {})
 
     (is (= [{:type "counter"
              :id "signups"
@@ -36,9 +36,9 @@
                                       :id
                                       :slice]))))))
 
-(deftest add-fact-with-options
+(deftest define-fact-with-options
 
-  (t/add-fact! service :time-distr :histogram 15 {:name "Time histogram"
+  (t/define-fact! service :time-distr :histogram 15 {:name "Time histogram"
                                                   :filler 0
                                                   :units "seconds"
                                                   :start 0
@@ -70,11 +70,11 @@
   )
 
 
-(deftest add-dimension
+(deftest define-dimension
 
-  (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
-  (t/add-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
-  (t/add-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+  (t/define-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/define-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
+  (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
 
   (is (= [{:id "company"  :name "Compania" :group_only true  :grouped_by [[]]}
           {:id "campaign" :name "Campania" :group_only false :grouped_by [[:company]]}
@@ -90,12 +90,12 @@
 
 (deftest new-fact-and-get-timeseries
 
-  (t/add-fact! service :signups :counter 10 {:name "Cantidad de registros"
+  (t/define-fact! service :signups :counter 10 {:name "Cantidad de registros"
                                              :filler 0
                                              :units "counter"})
 
-  (t/add-dimension! service :dependency {:name "Dependencia de Correo"})
-  (t/add-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"})
+  (t/define-dimension! service :dependency {:name "Dependencia de Correo"})
+  (t/define-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"})
 
   (t/new-fact! service :signups 1 {:dependency "32" :dependency_user "pepe"})
   (t/new-fact! service :signups #inst "2014-03-21" 1 {:dependency "31" :dependency_user "juanele"})
@@ -128,8 +128,8 @@
 
 (deftest new-fact-with-counter-not-1-and-get-timeseries
 
-  (t/add-fact! service :signups :counter 10 {:name "registros" :filler 0})
-  (t/add-dimension! service :dependency {:name "Dependencia de Correo"})
+  (t/define-fact! service :signups :counter 10 {:name "registros" :filler 0})
+  (t/define-dimension! service :dependency {:name "Dependencia de Correo"})
 
   ;; pass counter distinct to 1, for example: 3
   (t/new-fact! service :signups #inst "2014-03-21" 3 {:dependency "32"})
@@ -154,12 +154,12 @@
          (map :table_name))))
 
 (deftest drop-schema
-  (t/add-fact! service :signups :counter 10 {})
-  (t/add-fact! service :conversions  :counter 10 {})
+  (t/define-fact! service :signups :counter 10 {})
+  (t/define-fact! service :conversions  :counter 10 {})
 
-  (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
-  (t/add-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
-  (t/add-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+  (t/define-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/define-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
+  (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
 
   (t/drop-schema! service)
   (is (= [] (find-table-names db-spec))))
@@ -169,12 +169,12 @@
   (j/execute! db-spec
               (sql/sql (sql/create-table :random_table_name
                                          (sql/if-not-exists true))))
-  (t/add-fact! service :signups :counter 10 {})
-  (t/add-fact! service :conversions  :counter 10 {})
+  (t/define-fact! service :signups :counter 10 {})
+  (t/define-fact! service :conversions  :counter 10 {})
 
-  (t/add-dimension! service :company  {:group_only true                 :name "Compania"})
-  (t/add-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
-  (t/add-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+  (t/define-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/define-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
+  (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
 
   (t/drop-schema! service)
 

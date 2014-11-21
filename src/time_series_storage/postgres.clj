@@ -22,14 +22,14 @@
     (schema/drop-facts-table! config)
     (schema/drop-dimensions-table! config))
 
-  (add-fact! [service id type slice options]
+  (define-fact! [service id type slice options]
     (schema/create-fact! config
                          (keyword id)
                          (keyword type)
                          slice
                          options))
 
-  (add-dimension! [service id options]
+  (define-dimension! [service id options]
     (when-let [grouped-by (:grouped_by options)]
       (doseq [group grouped-by]
         (when-not (schema/get-dimensions config group)
