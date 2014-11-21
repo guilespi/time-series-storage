@@ -37,31 +37,35 @@ Work in progress. should be moved to the protocol api samples
 
 ```clojure
 
-(def db-spec {:classname "org.postgresql.Driver"
-                      :subprotocol "postgresql"
-                      :user "datomic"
-                      :password "datomic"
-                      :subname "//localhost:5432/database"})
+(def db-spec (or (System/getenv "DATABASE_URL")
+  "postgresql://postgres:postgres@localhost:5432/timeseries"))
 
-(require '[time-series-storage.api :as t]
+(require '[time-series-storage.api :as api])
+(require '[time-series-storage.postgres :as p])
+
 (import '[time_series_storage.postgres Postgres])
-(def service (->Postgres db-spec))
 
-(t/add-fact service ...)
+(def service (Postgres. db-spec))
+
+(t/define-fact service ...)
 
 ```
+
 ```clojure
-;;create-counter
-  (schema/create-fact! db-spec :registros :counter 15 {:name "Cantidad de registros"
+
+  (api/init-schema! service)
+
+  ;;create-counter
+  (api/define-fact! service :registros :counter 15 {:name "Cantidad de registros"
                                                 :filler 0
                                                 :units "counter"})
 
   ;;create-average
-  (schema/create-fact! db-spec :avg_time :average 15 {:name "Tiempo promedio"
+  (api/define-fact! service :avg_time :average 15 {:name "Tiempo promedio"
                                                :filler 0
                                                :units "seconds"})
   ;;create-histogram
-  (schema/create-fact! db-spec :time-distr :histogram 15 {:name "Histograma de tiempo"
+  (api/define-fact! service :time-distr :histogram 15 {:name "Histograma de tiempo"
                                                    :filler 0
                                                    :units "seconds"
                                                    :start 0
@@ -69,44 +73,57 @@ Work in progress. should be moved to the protocol api samples
                                                    :step 100})
 
   ;;
-  (schema/create-dimension! db-spec :company {:group_only true :name "Compania"})
-  (schema/create-dimension! db-spec :campaign {:grouped_by [:company] :name "Campania"})
-  (schema/create-dimension! db-spec :channel {:grouped_by [:company :campaign] :name "Canal"})
+  (api/define-dimension! service :company {:group_only true :name "Compania"})
+  (api/define-dimension! service :campaign {:grouped_by [[:company]] :name "Campania"})
+  (api/define-dimension! service :channel {:grouped_by [[:company :campaign]] :name "Canal"})
 
-  (schema/create-dimension! db-spec :dependency {:name "Dependencia de Correo"})
-  (schema/create-dimension! db-spec :dependency_user {:grouped_by [:dependency] :name "Usuario"})
+  (api/define-dimension! service :dependency {:name "Dependencia de Correo"})
+  (api/define-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"})
 
-  (u/new-fact db-spec :registros 1 {:dependency "32" :dependency_user "juanele"})
-  (u/new-fact db-spec :avg_time 15 {:company "bbva" :campaign "ventas" :channel "web"})
-  (u/new-fact db-spec :avg_time 15 {:company "bbva" :campaign "ventas" :channel "mail"})
+  (api/new-fact! service :registros 1 {:dependency "32" :dependency_user "juanele"})
+  (api/new-fact! service :registros 2 {:dependency "35" :dependency_user "pepe"})
 
-  (q/query db-spec
-         (schema/get-fact db-spec :avg_time)
-         (schema/get-dimension db-spec :campaign)
+  (api/get-timeseries service
+         :registros
+         :dependency
+         {:dependency "32"}
+         #inst "2012-01-01"
+         #inst "2020-01-01")
+  ;; => ({:counter 1, :dependency "32", :timestamp "20141121T134500.000Z"})
+
+  (api/get-timeseries service
+           :registros
+           :dependency
+           {:dependency "35"}
+           #inst "2012-01-01"
+           #inst "2020-01-01")
+  ;; => ({:counter 2, :dependency "35", :timestamp "20141121T134500.000Z"}
+
+  (api/get-timeseries service
+           :registros
+           :dependency
+           {}
+           #inst "2012-01-01"
+           #inst "2020-01-01")
+  ;; => ({:counter 1, :dependency "32", :timestamp "20141121T134500.000Z"} {:counter 2, :dependency "35", :timestamp "20141121T134500.000Z"})
+
+  (api/new-fact! service :avg_time 15 {:company "bbva" :campaign "ventas" :channel "web"})
+  (api/new-fact! service :avg_time 15 {:company "bbva" :campaign "ventas" :channel "mail"})
+
+  (api/get-timeseries service
+         :avg_time
+         :campaign
          {:company "bbva" :campaign "ventas"}
          (tcoerce/from-date #inst "2012-01-01")
          (tcoerce/from-date #inst "2020-01-01"))
 
-  (q/query db-spec
-         (schema/get-fact db-spec :avg_time)
-         (schema/get-dimension db-spec :channel)
+  (api/get-timeseries service
+         :avg_time
+         :channel
          {:company "bbva" :campaign "ventas" :channel "web"}
          (tcoerce/from-date #inst "2012-01-01")
          (tcoerce/from-date #inst "2020-01-01"))
 
-  (q/query db-spec
-         (schema/get-fact db-spec :registros)
-         (schema/get-dimension db-spec :dependency)
-         {:dependency "32"}
-         (tcoerce/from-date #inst "2012-01-01")
-         (tcoerce/from-date #inst "2020-01-01"))
-
-  (q/query db-spec
-           (schema/get-fact db-spec :registros)
-           (schema/get-dimension db-spec :dependency)
-           {:dependency "35"}
-           (tcoerce/from-date #inst "2012-01-01")
-           (tcoerce/from-date #inst "2020-01-01"))
 ```
 
 License
