@@ -2,11 +2,11 @@
 
 (defprotocol TimeSeries
 
-  (add-fact! [service id type slice options]
-    "Adds a new fact to the service database")
+  (define-fact! [service id type slice options]
+    "Adds a new fact definition to the service database")
 
-  (add-dimension! [service id options]
-    "Adds a new dimension to the service database")
+  (define-dimension! [service id options]
+    "Adds a new dimension defintion to the service database")
 
   (facts [service]
     "Retrieves all defined facts")
