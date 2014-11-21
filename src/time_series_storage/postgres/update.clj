@@ -44,13 +44,15 @@
   (filter identity
           (for [group (:grouped_by dimension)]
             (let [table-name (->> (conj group (:id dimension))
-                                  (make-table-name fact))]
+                                  (make-table-name fact))
+                  value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (with [:upsert (update table-name '((= counter counter+1))
+                (with [:upsert (update table-name `((:= ~'counter
+                                                        ~(symbol (str "counter+" value))))
                                        (where (expand-condition key))
                                        (returning *))]
                       (insert table-name (conj (keys key) :counter)
-                              (select (conj (vals key) 1))
+                              (select (conj (vals key) value))
                               (where `(not-exists ~(select [*] (from :upsert)))))))))))
 
 (defmethod make-dimension-fact :average
@@ -78,7 +80,7 @@
   "When a new fact occurs update all the corresponding dimensions specified in the fact
    categories. If some category is not updatable the complete fact fails (this is in
    order to avoid counter mismatches)"
-  [db {:keys [fact-id] :as fact} timestamp value categories dims]
+  [db {fact-id :id :as fact} timestamp value categories dims]
   (let [event (merge categories {fact-id value})
         tx (->> (vals dims)
                 (filter #(not (:group_only %)))

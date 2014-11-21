@@ -126,6 +126,23 @@
            (-> (first timeseries) :timestamp tcoerce/from-string))))
   )
 
+(deftest new-fact-with-counter-not-1-and-get-timeseries
+
+  (t/add-fact! service :signups :counter 10 {:name "registros" :filler 0})
+  (t/add-dimension! service :dependency {:name "Dependencia de Correo"})
+
+  ;; pass counter distinct to 1, for example: 3
+  (t/new-fact! service :signups #inst "2014-03-21" 3 {:dependency "32"})
+
+  (let [timeseries (t/get-timeseries service
+                                     :signups
+                                     :dependency
+                                     {}
+                                     #inst "2012-01-01"
+                                     #inst "2020-01-01")]
+    (is (= [3]
+           (map :counter timeseries)))))
+
 (defn find-table-names
   [db]
   (let [query (sql/sql
