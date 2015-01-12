@@ -14,16 +14,22 @@
         (<= :timestamp ~(get-slice slice finish))))
 
 (defn- best-grouping
-  [groupings data]
-  (first
-   (drop-while #(not= (set (keys data))
-                      (set (keys (select-keys data %)))) groupings)))
+  [groupings dimension data]
+  (conj
+   (first
+    ;;always add dimension as part of the grouping keys to enable
+    ;;filtering by the last dimension too
+    (drop-while #(not= (set (conj (keys data) dimension))
+                       (set (conj (keys (select-keys data %)) dimension)))
+                groupings))
+   dimension))
 
 (defn query
   "Retrieves a particular range of values for the specified fact and dimension."
   [db fact dimension filter-data start finish]
-  (let [grouping (conj (best-grouping (:grouped_by dimension) filter-data)
-                       (keyword (:id dimension)))
+  (let [grouping (best-grouping (:grouped_by dimension)
+                                (keyword (:id dimension))
+                                filter-data)
         table-name (make-table-name fact grouping)
         slice (or (:slice dimension) (:slice fact))
         condition (range-where slice
