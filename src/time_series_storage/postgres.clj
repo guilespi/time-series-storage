@@ -79,11 +79,17 @@
               categories))
 
   (inc! [service fact-id timestamp categories]
-    (u/new-fact config
-                fact-id
-                (tcoerce/from-date timestamp)
-                1
-                categories))
+    (if-let [fact (api/fact service fact-id)]
+      (if-let [dims (schema/get-dimensions config (keys categories))]
+        ;;for each dimension definition update fact in properly grouped tables
+        (u/new-fact config
+                    fact
+                    (tcoerce/from-date timestamp)
+                    1
+                    categories
+                    dims)
+        (throw (Exception. "Some specified categories do not exist")))
+      (throw (Exception. (format "Fact %s is not defined" fact-id)))))
 
   (get-timeseries [service fact dimension query-data start finish step]
     (if-let [fact-def (schema/get-fact config fact)]
