@@ -89,7 +89,8 @@
                              :day (t/days 1)
                              :week (t/weeks 1)
                              :month (t/months 1)
-                             :year (t/years 1)))
+                             :year (t/years 1)
+                             :hour (t/hours 1)))
             finish
             step)))))
 
