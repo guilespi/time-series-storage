@@ -64,7 +64,7 @@
           (for [group (:grouped_by dimension)]
             (let [table-name (->> (conj group (:id dimension))
                                   (make-table-name fact))
-                  value (get event (keyword (:id fact)))]
+                  value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
                 (with [:upsert (update table-name (conj '()
                                                         '(= counter counter+1)
