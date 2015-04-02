@@ -1,8 +1,11 @@
 (ns time-series-storage.postgres.query
   (:refer-clojure :exclude [distinct group-by])
-  (:require [clojure.java.jdbc :as j])
+  (:require [clojure.java.jdbc :as j]
+            [sqlingvo.db :as sqdb])
   (:use sqlingvo.core
         time-series-storage.postgres.common))
+
+(def sqdb (sqdb/postgresql))
 
 (defn- range-where
   "Retrieves a time-ranged condition for a specific fact in
@@ -39,6 +42,6 @@
                                finish)]
     (j/query db
       (sql
-       (select [*]
+       (select sqdb [*]
                (from table-name)
                (where condition))))))
