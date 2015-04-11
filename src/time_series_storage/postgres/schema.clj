@@ -1,10 +1,12 @@
 (ns time-series-storage.postgres.schema
   (:refer-clojure :exclude [distinct group-by])
   (:require [clojure.java.jdbc :as j]
+            [sqlingvo.db :as sqdb]
             [clojure.string :as string])
   (:use sqlingvo.core
         time-series-storage.postgres.common))
 
+(def sqdb (sqdb/postgresql))
 
 (defn get-fact
   "Retrieves a fact definition from database, nil if fact does not exists"
@@ -12,7 +14,7 @@
   (first
    (j/query db
             (sql
-             (select [*]
+             (select sqdb [*]
                (from :facts)
                (where `(= :id ~(name fact))))))))
 
@@ -21,7 +23,7 @@
   [db]
   (j/query db
             (sql
-             (select [*]
+             (select sqdb [*]
                (from :facts)))))
 
 (defn all-dimensions
@@ -30,7 +32,7 @@
   (map #(update-in % [:grouped_by] read-string)
        (j/query db
                 (sql
-                 (select [*]
+                 (select sqdb [*]
                          (from :dimensions))))))
 
 
@@ -39,7 +41,7 @@
    a map of definitions keyed by dimension"
   [db s]
   (let [dims (seq (j/query db
-                           (sql (select [*]
+                           (sql (select sqdb [*]
                                   (from :dimensions)
                                   (where `(in :id ~(map #(name %) s)))))))
         defs (reduce #(assoc %1 (keyword (:id %2)) (update-in %2 [:grouped_by] read-string))
@@ -54,7 +56,7 @@
   [db id]
   (when-let [dim (first
                   (j/query db
-                    (sql (select [*]
+                    (sql (select sqdb [*]
                                  (from :dimensions)
                                  (where `(= :id ~(name id)))))))]
     (update-in dim [:grouped_by] read-string)))
@@ -63,7 +65,7 @@
   [db]
   (j/execute! db
     (sql
-     (create-table :facts
+     (create-table sqdb :facts
        (if-not-exists true)
        (column :id :varchar :length 40 :primary-key? true)
        (column :name :varchar :length 40)
@@ -79,14 +81,14 @@
   [db]
   (j/execute! db
     (sql
-      (drop-table [:facts]
+      (drop-table sqdb [:facts]
         (if-exists true)))))
 
 (defn create-dimensions-table!
   [db]
   (j/execute! db
     (sql
-     (create-table :dimensions
+     (create-table sqdb :dimensions
        (if-not-exists true)
        (column :id :varchar :length 40 :primary-key? true)
        (column :name :varchar :length 40)
@@ -98,7 +100,7 @@
   [db]
   (j/execute! db
     (sql
-      (drop-table [:dimensions]
+      (drop-table sqdb [:dimensions]
         (if-exists true)))))
 
 (defn create-fact!
@@ -106,7 +108,7 @@
   [db id type slice {:keys [name filler units
                             start end step]}]
   (j/execute! db
-    (sql (insert :facts []
+    (sql (insert sqdb :facts []
            (values {:id (clojure.core/name id)
                     :name name
                     :type (clojure.core/name type)
@@ -121,7 +123,7 @@
   "Returns the query needed to create a dimension table
    for the specified parameters."
   [id {:keys [slice name group_only grouped_by]}]
-  (insert :dimensions []
+  (insert sqdb :dimensions []
       (values {:id (clojure.core/name id)
                :name name
                :slice slice
@@ -155,7 +157,7 @@
      * Columns according to total dimensions
      * Columns according to fact type"
   [fact dims]
-  (create-table (make-table-name fact dims)
+  (create-table sqdb (make-table-name fact dims)
     (if-not-exists true)
     ;;primary key is composite on all dimensions + timestamp
     (apply primary-key (concat [:timestamp] dims))
@@ -175,7 +177,7 @@
   (->> grouped-by
        (map #(conj % dim-id))
        (map #(make-table-name fact %))
-       (map #(drop-table [%]
+       (map #(drop-table sqdb [%]
                          (if-exists true)))))
 
 (defn- drop-fact-time-series-stmts

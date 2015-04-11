@@ -1,10 +1,12 @@
 (ns time-series-storage.postgres.update
   (:refer-clojure :exclude [distinct group-by])
   (:require [clojure.java.jdbc :as j]
+            [sqlingvo.db :as sqdb]
             [time-series-storage.postgres.schema :as schema])
   (:use sqlingvo.core
         time-series-storage.postgres.common))
 
+(def sqdb (sqdb/postgresql))
 
 (defn event-key
   "Returns the particular key for updating a fact in a specific dimension.
@@ -47,13 +49,14 @@
                                   (make-table-name fact))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (with [:upsert (update table-name `((:= ~'counter
-                                                        ~(symbol (str "counter+" value))))
-                                       (where (expand-condition key))
-                                       (returning *))]
-                      (insert table-name (conj (keys key) :counter)
-                              (select (conj (vals key) value))
-                              (where `(not-exists ~(select [*] (from :upsert)))))))))))
+                (with sqdb [:upsert (update sqdb table-name
+                                            `((:= ~'counter
+                                                  ~(symbol (str "counter+" value))))
+                                            (where (expand-condition key))
+                                            (returning *))]
+                      (insert sqdb table-name (conj (keys key) :counter)
+                              (select sqdb (conj (vals key) value))
+                              (where `(not-exists ~(select sqdb [*] (from :upsert)))))))))))
 
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
@@ -66,15 +69,16 @@
                                   (make-table-name fact))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (with [:upsert (update table-name (conj '()
-                                                        '(= counter counter+1)
-                                                        (concat '(= total)
-                                                                [(symbol (str "total+" value))]))
-                                       (where (expand-condition key))
-                                       (returning *))]
-                      (insert table-name (concat (keys key) [:counter :total])
-                              (select (conj (vec (vals key)) 1 value))
-                              (where `(not-exists ~(select [*] (from :upsert)))))))))))
+                (with sqdb [:upsert (update sqdb table-name
+                                            (conj '()
+                                                  '(= counter counter+1)
+                                                  (concat '(= total)
+                                                          [(symbol (str "total+" value))]))
+                                            (where (expand-condition key))
+                                            (returning *))]
+                      (insert sqdb table-name (concat (keys key) [:counter :total])
+                              (select sqdb (conj (vec (vals key)) 1 value))
+                              (where `(not-exists ~(select sqdb [*] (from :upsert)))))))))))
 
 (defn new-fact
   "When a new fact occurs update all the corresponding dimensions specified in the fact

@@ -5,8 +5,11 @@
             [time-series-storage.postgres.schema :as schema]
             [clojure.java.jdbc :as j]
             [sqlingvo.core :as sql]
+            [sqlingvo.db :as sqdb]
             [clj-time.coerce :as tcoerce])
   (:import [time_series_storage.postgres Postgres]))
+
+(def sqdb (sqdb/postgresql))
 
 (def db-spec (or (System/getenv "DATABASE_URL")
   "postgresql://postgres:postgres@localhost:5432/timeseries_test"))
@@ -146,7 +149,7 @@
 (defn find-table-names
   [db]
   (let [query (sql/sql
-                (sql/select [:table_name]
+                (sql/select sqdb [:table_name]
                             (sql/from :information_schema.tables)
                             (sql/where '(= :table_schema "public"))))]
     (->> query
@@ -167,7 +170,7 @@
 
 (deftest drop-schema-keeps-other-tables
   (j/execute! db-spec
-              (sql/sql (sql/create-table :random_table_name
+              (sql/sql (sql/create-table sqdb :random_table_name
                                          (sql/if-not-exists true))))
   (t/define-fact! service :signups :counter 10 {})
   (t/define-fact! service :conversions  :counter 10 {})
@@ -181,4 +184,4 @@
   (is (= ["random_table_name"] (find-table-names db-spec)))
 
   (j/execute! db-spec
-              (sql/sql (sql/drop-table [:random_table_name]))))
+              (sql/sql (sql/drop-table sqdb [:random_table_name]))))
