@@ -95,7 +95,7 @@
             step)))))
 
 (defn fill-range
-  [start finish step data]
+  [data start finish step]
   (if (= :none step)
     data
     (apply merge

@@ -100,33 +100,48 @@
   (t/define-dimension! service :dependency {:name "Dependencia de Correo"})
   (t/define-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"})
 
-  (t/new-fact! service :signups 1 {:dependency "32" :dependency_user "pepe"})
-  (t/new-fact! service :signups #inst "2014-03-21" 1 {:dependency "31" :dependency_user "juanele"})
+  (t/new-fact! service :signups #inst "2014-03-21T09:09" 1 {:dependency "32" :dependency_user "pepe"})
+  (t/new-fact! service :signups #inst "2014-03-21T10:23" 1 {:dependency "31" :dependency_user "juanele"})
 
-  (let [timeseries (t/get-timeseries service
-                                     :signups
-                                     :dependency_user
-                                     {:dependency "31"}
-                                     #inst "2012-01-01"
-                                     #inst "2020-01-01")]
-    (is (= [{:dependency_user "juanele" :counter 1 :dependency "31"}]
-           (map #(select-keys % [:dependency_user :dependency :counter])
-                timeseries)))
-    (is (= (tcoerce/from-string "2014-03-21")
-           (tcoerce/from-string (:timestamp (first timeseries))))))
+  (testing "1 timeseries"
+    (let [timeseries (t/get-timeseries service
+                                       :signups
+                                       :dependency_user
+                                       {:dependency "31"}
+                                       #inst "2014-03-21T09:00"
+                                       #inst "2014-03-21T13:00")]
+      (is (= {{:dependency_user "juanele" :dependency "31"} {:all 1}}
+             timeseries))))
 
-  (let [timeseries (t/get-timeseries service
-                           :signups
-                           :dependency_user
-                           {:dependency nil}
-                           #inst "2012-01-01"
-                           #inst "2020-01-01")]
-    (is (= [{:dependency_user "juanele" :counter 1 :dependency "31"}
-            {:dependency_user "pepe"    :counter 1 :dependency "32"}]
-           (map #(select-keys % [:dependency_user :dependency :counter])
-                timeseries)))
-    (is (= (tcoerce/from-string "2014-03-21")
-           (-> (first timeseries) :timestamp tcoerce/from-string))))
+  (testing "many timeseries without step"
+    (let [timeseries (t/get-timeseries service
+                                       :signups
+                                       :dependency_user
+                                       {:dependency nil}
+                                       #inst "2014-03-21T09:00"
+                                       #inst "2014-03-21T13:00")]
+      (is (= {{:dependency_user "juanele" :dependency "31"} {:all 1}
+              {:dependency_user "pepe" :dependency "32"} {:all 1}}
+             timeseries))))
+
+  (testing "many timeseries with step"
+    (let [timeseries (t/get-timeseries service
+                                       :signups
+                                       :dependency_user
+                                       {:dependency nil}
+                                       #inst "2014-03-21T09:00"
+                                       #inst "2014-03-21T13:00"
+                                       :hour)]
+      (is (= #{{:dependency_user "juanele" :dependency "31"}
+               {:dependency_user "pepe" :dependency "32"}}
+             (set (keys timeseries))))
+      (is (= {#inst "2014-03-21T09:00" 0
+              #inst "2014-03-21T10:00" 1
+              #inst "2014-03-21T11:00" 0
+              #inst "2014-03-21T12:00" 0}
+             (-> timeseries
+                 (get {:dependency_user "juanele" :dependency "31"}))))
+      ))
   )
 
 (deftest new-fact-with-counter-not-1-and-get-timeseries
@@ -137,14 +152,13 @@
   ;; pass counter distinct to 1, for example: 3
   (t/new-fact! service :signups #inst "2014-03-21" 3 {:dependency "32"})
 
-  (let [timeseries (t/get-timeseries service
-                                     :signups
-                                     :dependency
-                                     {}
-                                     #inst "2012-01-01"
-                                     #inst "2020-01-01")]
-    (is (= [3]
-           (map :counter timeseries)))))
+  (is (= {{:dependency "32"} {:all 3}}
+         (t/get-timeseries service
+                           :signups
+                           :dependency
+                           {}
+                           #inst "2012-01-01"
+                           #inst "2020-01-01"))))
 
 (defn find-table-names
   [db]
