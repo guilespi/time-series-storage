@@ -100,12 +100,10 @@
                                    query-data
                                    (tcoerce/from-date start)
                                    (tcoerce/from-date finish))]
-          (if step
-            (fill-range start
-                        finish
-                        step
-                        (collapse data-points step))
-            data-points))
+          (fill-range start
+                      finish
+                      (or step :none)
+                      (collapse data-points step)))
         (throw (Exception. (format "Non existent dimension %s specified. Please check your schema" dimension))))
       (throw (Exception. (format "Non existent fact %s specified. Please check your schema." fact)))))
 
