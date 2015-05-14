@@ -62,13 +62,14 @@
   (apply merge
          (for [[k v] (group-by #(select-keys % (keys (dissoc % :counter :timestamp :total)))
                                rows)]
-           (->> (group-by (partial time-dimension by) v)
+           {k (->> (group-by (partial time-dimension by) v)
                 (map (fn [[k v]]
-                       {(tcoerce/from-string k) (reduce #(merge-with + %1 (select-keys %2 [:counter
+                       {(or (tcoerce/from-string k) k) (reduce #(merge-with + %1 (select-keys %2 [:counter
                                                                                            :total]))
                                                         {:counter 0
                                                          :total 0}
-                                                        v)}))))))
+                                                        v)}))
+                (apply merge))})))
 
 (defmethod collapse :histogram
   [rows by]
@@ -95,7 +96,8 @@
             step)))))
 
 (defn fill-range
-  [start finish step data]
+  [data start finish step]
+  (assert step "step must not be nil. consider passing :none")
   (if (= :none step)
     data
     (apply merge
@@ -106,3 +108,9 @@
                                               step)]
                          ;;TODO the filler should be by dimension definition
                          {(tcoerce/to-date date) (or (get series date) 0)}))}))))
+
+(defn collapse-and-fill-range [data start finish step]
+  (-> (collapse data step)
+      (fill-range start
+                  finish
+                  step)))

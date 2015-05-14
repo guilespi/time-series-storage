@@ -94,18 +94,16 @@
   (get-timeseries [service fact dimension query-data start finish step]
     (if-let [fact-def (schema/get-fact config fact)]
       (if-let [dim-def (schema/get-dimension config dimension)]
-        (let [data-points (q/query config
-                                   fact-def
-                                   dim-def
-                                   query-data
-                                   (tcoerce/from-date start)
-                                   (tcoerce/from-date finish))]
-          (if step
-            (fill-range start
-                        finish
-                        step
-                        (collapse data-points step))
-            data-points))
+        (-> (q/query config
+                     fact-def
+                     dim-def
+                     query-data
+                     (tcoerce/from-date start)
+                     (tcoerce/from-date finish))
+            (collapse-and-fill-range
+              start
+              finish
+              (or step :none)))
         (throw (Exception. (format "Non existent dimension %s specified. Please check your schema" dimension))))
       (throw (Exception. (format "Non existent fact %s specified. Please check your schema." fact)))))
 
