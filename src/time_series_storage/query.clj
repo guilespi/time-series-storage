@@ -108,3 +108,9 @@
                                               step)]
                          ;;TODO the filler should be by dimension definition
                          {(tcoerce/to-date date) (or (get series date) 0)}))}))))
+
+(defn collapse-and-fill-range [data start finish step]
+  (-> (collapse data step)
+      (fill-range start
+                  finish
+                  step)))
