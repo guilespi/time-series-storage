@@ -7,4 +7,5 @@
                  [org.clojure/java.jdbc "0.3.5"]
                  [postgresql/postgresql "8.4-702.jdbc4"]
                  [clj-time "0.8.0"]
-                 [sqlingvo "0.7.10"]])
+                 [sqlingvo "0.7.10"]]
+  :profiles {:1.7.0 {:dependencies [[org.clojure/clojure "1.7.0-RC1"]]}})
