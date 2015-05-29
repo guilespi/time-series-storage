@@ -1,5 +1,5 @@
 (ns time-series-storage.postgres.update
-  (:refer-clojure :exclude [distinct group-by])
+  (:refer-clojure :exclude [distinct group-by update])
   (:require [clojure.java.jdbc :as j]
             [sqlingvo.db :as sqdb]
             [time-series-storage.postgres.schema :as schema])
