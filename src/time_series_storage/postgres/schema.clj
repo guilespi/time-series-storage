@@ -29,11 +29,12 @@
 (defn all-dimensions
   "Returns all dimensions defined on the database"
   [db]
-  (map #(update-in % [:grouped_by] read-string)
-       (j/query db
+  (->> (j/query db
                 (sql
                  (select sqdb [*]
-                         (from :dimensions))))))
+                         (from :dimensions))))
+       (map #(update-in % [:grouped_by] read-string))
+       (map #(update-in % [:facts] read-string))))
 
 
 (defn get-dimensions
@@ -44,7 +45,10 @@
                            (sql (select sqdb [*]
                                   (from :dimensions)
                                   (where `(in :id ~(map #(name %) s)))))))
-        defs (reduce #(assoc %1 (keyword (:id %2)) (update-in %2 [:grouped_by] read-string))
+        defs (reduce #(assoc %1 (keyword (:id %2))
+                             (-> %2
+                                 (update-in [:grouped_by] read-string)
+                                 (update-in [:facts] read-string)))
                      {} dims)]
     ;;if keys do not match some dimension does not exist
     (when (= (set s) (set (keys defs)))
@@ -59,7 +63,9 @@
                     (sql (select sqdb [*]
                                  (from :dimensions)
                                  (where `(= :id ~(name id)))))))]
-    (update-in dim [:grouped_by] read-string)))
+    (-> dim
+        (update-in [:grouped_by] read-string)
+        (update-in [:facts] read-string))))
 
 (defn create-facts-table!
   [db]
@@ -94,7 +100,8 @@
        (column :name :varchar :length 40)
        (column :slice :integer)
        (column :group_only :boolean :default 'FALSE)
-       (column :grouped_by :varchar :length 300)))))
+       (column :grouped_by :varchar :length 500)
+       (column :facts :varchar :length 500)))))
 
 (defn drop-dimensions-table!
   [db]
@@ -122,13 +129,14 @@
 (defn make-dimension
   "Returns the query needed to create a dimension table
    for the specified parameters."
-  [id {:keys [slice name group_only grouped_by]}]
+  [id {:keys [slice name group_only grouped_by facts]}]
   (insert sqdb :dimensions []
       (values {:id (clojure.core/name id)
                :name name
                :slice slice
                :group_only (or group_only false)
-               :grouped_by (pr-str (or grouped_by [[]]))})))
+               :grouped_by (pr-str (or grouped_by [[]]))
+               :facts (pr-str (or (set facts) #{}))})))
 
 
 (defmulti create-fact-column (fn [_ fact] (keyword (:type fact))))
@@ -199,7 +207,12 @@
   tables needed to keep track of all the configured faacts up to
   the moment"
   [db id opts]
-  (let [facts (all-facts db)
+  (let [facts (->> (all-facts db)
+                   (#(if (:facts opts)
+                       (filter (fn [fact]
+                                 (contains? (set (:facts opts))
+                                            (keyword (:id fact)))) %)
+                       %)))
         grouped-by (or (:grouped_by opts) [[]])
         time-series-tables (when-not (:group_only opts)
                              (for [fact facts

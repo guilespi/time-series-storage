@@ -60,17 +60,18 @@
       (throw (Exception. "Some categories have nil values")))
 
     (if-let [fact (api/fact service fact-id)]
-      (if-let [dims (schema/get-dimensions config (keys categories))]
+      (if-let [dims (->> (schema/get-dimensions config (keys categories))
+                         (filter (fn [[k d]] (contains? (:facts d) fact-id)))
+                         seq)]
         ;;for each dimension definition update fact in properly grouped tables
         (u/new-fact config
                     fact
                     (tcoerce/from-date timestamp)
                     value
                     categories
-                    dims)
-        (throw (Exception. "Some specified categories do not exist")))
-      (throw (Exception. (format "Fact %s is not defined" fact-id))))
-    )
+                    (into {} dims))
+        (throw (Exception. "None of the dimensions specified track the supplied fact")))
+      (throw (Exception. (format "Fact %s is not defined" fact-id)))))
 
   (inc! [service fact-id categories]
     (api/inc! service
@@ -80,15 +81,16 @@
 
   (inc! [service fact-id timestamp categories]
     (if-let [fact (api/fact service fact-id)]
-      (if-let [dims (schema/get-dimensions config (keys categories))]
-        ;;for each dimension definition update fact in properly grouped tables
+      (if-let [dims (->> (schema/get-dimensions config (keys categories))
+                         (filter (fn [[k d]] (contains? (:facts d) fact-id)))
+                         seq)]
         (u/new-fact config
                     fact
                     (tcoerce/from-date timestamp)
                     1
                     categories
-                    dims)
-        (throw (Exception. "Some specified categories do not exist")))
+                    (into {} dims))
+        (throw (Exception. "None of the dimensions specified track the supplied fact")))
       (throw (Exception. (format "Fact %s is not defined" fact-id)))))
 
   (get-timeseries [service fact dimension query-data start finish step]
