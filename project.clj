@@ -1,4 +1,4 @@
-(defproject time-series-storage "0.2.1"
+(defproject time-series-storage "0.2.2"
   :description "Time Series Storage Library"
   :url "https://github.com/guilespi/time-series-storage"
   :license {:name "Eclipse Public License"

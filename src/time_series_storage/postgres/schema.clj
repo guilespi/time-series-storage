@@ -99,6 +99,7 @@
        (column :id :varchar :length 40 :primary-key? true)
        (column :name :varchar :length 40)
        (column :slice :integer)
+       (column :size :integer)
        (column :group_only :boolean :default 'FALSE)
        (column :grouped_by :varchar :length 500)
        (column :facts :varchar :length 500)))))
@@ -129,11 +130,12 @@
 (defn make-dimension
   "Returns the query needed to create a dimension table
    for the specified parameters."
-  [id {:keys [slice name group_only grouped_by facts]}]
+  [id {:keys [slice name group_only grouped_by facts size]}]
   (insert sqdb :dimensions []
       (values {:id (clojure.core/name id)
                :name name
                :slice slice
+               :size (or size 40)
                :group_only (or group_only false)
                :grouped_by (pr-str (or grouped_by [[]]))
                :facts (pr-str (or (set facts) #{}))})))
@@ -164,7 +166,7 @@
 
      * Columns according to total dimensions
      * Columns according to fact type"
-  [fact dims]
+  [fact dims default-size dim-defs]
   (create-table sqdb (make-table-name fact dims)
     (if-not-exists true)
     ;;primary key is composite on all dimensions + timestamp
@@ -173,7 +175,8 @@
     ;;this looks like magic because it is, a monad sequence transformer
     ;;dynamically appends columns to current statement
     (fn [stmt]
-      [nil (reduce #(second ((column %2 :varchar :length 40) %1))
+      [nil (reduce #(second ((column %2 :varchar :length (or (:size (get dim-defs (name %2)))
+                                                             default-size)) %1))
                    stmt
                    dims)])
     (fn [stmt]
@@ -214,9 +217,13 @@
                                             (keyword (:id fact)))) %)
                        %)))
         grouped-by (or (:grouped_by opts) [[]])
+        dims (all-dimensions db)
         time-series-tables (when-not (:group_only opts)
                              (for [fact facts
                                    group grouped-by]
-                               (make-time-series-table fact (conj group id))))
+                               (make-time-series-table fact
+                                                       (conj group id)
+                                                       (or (:size opts) 40)
+                                                       (reduce #(assoc %1 (:id %2) %2) {} dims))))
         tx (conj time-series-tables (make-dimension id opts))]
     (execute-with-transaction! db (map sql tx))))
