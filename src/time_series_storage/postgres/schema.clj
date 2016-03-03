@@ -140,6 +140,18 @@
                :grouped_by (pr-str (or grouped_by [[]]))
                :facts (pr-str (or (set facts) #{}))})))
 
+(defn update-dimension
+  "Returns the query needed to update a dimension table
+  for the specified parameters."
+  [id {:keys [slice name group_only grouped_by facts size]}]
+  (update sqdb :dimensions
+          {:name name
+           :slice slice
+           :size (or size 40)
+           :group_only (or group_only false)
+           :grouped_by (pr-str (or grouped_by [[]]))
+           :facts (pr-str (or (set facts) #{}))}
+          (where `(= :id ~(clojure.core/name id)))))
 
 (defmulti create-fact-column (fn [_ fact] (keyword (:type fact))))
 
@@ -226,4 +238,21 @@
                                                        (or (:size opts) 40)
                                                        (reduce #(assoc %1 (:id %2) %2) {} dims))))
         tx (conj time-series-tables (make-dimension id opts))]
+    (execute-with-transaction! db (map sql tx))))
+
+
+(defn add-dimension-fact!
+  [db id fact]
+  (let [dimension (get-dimension db id)
+        grouped-by (:grouped_by dimension)
+        dims (all-dimensions db)
+        time-series-tables (for [group grouped-by]
+                             (make-time-series-table fact
+                                                     (conj group id)
+                                                     (:size dimension)
+                                                     (reduce #(assoc %1 (:id %2) %2) {} dims)))
+        tx (conj time-series-tables
+                 (update-dimension id (assoc dimension
+                                             :facts
+                                             (conj (:facts dimension) fact))))]
     (execute-with-transaction! db (map sql tx))))

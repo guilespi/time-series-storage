@@ -127,6 +127,12 @@
                    :group_only (or (:group_only options) false)
                    :facts (if (:facts options) (set (:facts options)) #{})})))
 
+  (update-dimension! [service id fact-id]
+    (if-let [fact (api/fact service fact-id)]
+      (throw (Exception. "not implemented"))
+      (throw (Exception. (format "Fact %s is not defined" fact-id)))))
+
+
   (facts [service]
     (map second (:facts @config)))
 

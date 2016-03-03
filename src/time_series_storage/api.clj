@@ -8,6 +8,9 @@
   (define-dimension! [service id options]
     "Adds a new dimension defintion to the service database")
 
+  (update-dimension! [service id fact]
+    "Updates dimension tracked facts")
+
   (facts [service]
     "Retrieves all defined facts")
 

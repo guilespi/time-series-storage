@@ -39,6 +39,13 @@
                               (keyword id)
                               options))
 
+  (update-dimension! [service id fact-id]
+    (if-let [fact (api/fact service fact-id)]
+      (schema/add-dimension-fact! config
+                                  (keyword id)
+                                  fact)
+      (throw (Exception. (format "Fact %s is not defined" fact-id)))))
+
   (facts [service]
     (schema/all-facts config))
 
