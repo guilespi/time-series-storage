@@ -1,4 +1,4 @@
-(defproject time-series-storage "0.2.3"
+(defproject time-series-storage "0.3.1"
   :description "Time Series Storage Library"
   :url "https://github.com/guilespi/time-series-storage"
   :license {:name "Eclipse Public License"
@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/java.jdbc "0.3.5"]
                  [postgresql/postgresql "8.4-702.jdbc4"]
+                 [com.microsoft.sqlserver/sqljdbc4 "4.2"]
                  [clj-time "0.8.0"]
                  [sqlingvo "0.7.10"]]
   :profiles {:1.7.0 {:dependencies [[org.clojure/clojure "1.7.0-RC1"]]}})
