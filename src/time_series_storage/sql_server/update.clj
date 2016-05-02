@@ -2,11 +2,19 @@
   (:refer-clojure :exclude [distinct group-by update])
   (:require [clojure.java.jdbc :as j]
             [sqlingvo.db :as sqdb]
+            [clojure.string :as string]
             [time-series-storage.postgres.schema :as schema])
   (:use sqlingvo.core
         time-series-storage.sql-server.common))
 
 (def sqdb (sqdb/sqlserver))
+
+(defn- format-name
+  [n]
+  (-> n
+      name
+      (string/replace "-" "_")
+      (string/replace ":" "")))
 
 (defn event-key
   "Returns the particular key for updating a fact in a specific dimension.
@@ -39,8 +47,8 @@
 (defn expand-matcher
   [keyvals]
   (->> (for [[k v] keyvals]
-         (format "%s = '%s'" (name k) v))
-       (clojure.string/join " AND ")))
+         (format "[%s] = '%s'" (format-name k) v))
+       (string/join " AND ")))
 
 (def upsert-query-string ""
   "IF EXISTS (select * FROM %s WITH (updlock,serializable) where %s)
@@ -64,21 +72,19 @@
   ;;some groupings may not generate upserts when data is missing
   (filter identity
           (for [group (:grouped_by dimension)]
-            (let [table-name (->> (conj group (:id dimension))
-                                  (make-table-name fact))
+            (let [table-name (format-name (->> (conj group (:id dimension))
+                                               (make-table-name fact)))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
                 (format upsert-query-string
                         (name table-name)
                         (expand-matcher key)
                         (name table-name)
-                        (str "counter = counter + " value)
+                        (str "[counter] = [counter] + " value)
                         (expand-matcher key)
                         (name table-name)
-                        (clojure.string/join ", " (map name (conj (keys key) :counter)))
-                        (clojure.string/join ", " (conj (map #(str "'" % "'") (vals key)) value))))))))
-
-
+                        (string/join ", " (map #(str "["(format-name %)"]") (conj (keys key) :counter)))
+                        (string/join ", " (conj (map #(str "'" % "'") (vals key)) value))))))))
 
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
@@ -87,19 +93,19 @@
   ;;some groupings may not generate upserts when data is missing
   (filter identity
           (for [group (:grouped_by dimension)]
-            (let [table-name (->> (conj group (:id dimension))
-                                  (make-table-name fact))
+            (let [table-name  (format-name (->> (conj group (:id dimension))
+                                                (make-table-name fact)))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
                 (format upsert-query-string
                         (name table-name)
                         (expand-matcher key)
                         (name table-name)
-                        (format "counter = counter + 1, total = total + %s" value)
+                        (format "[counter] = [counter] + 1, [total] = [total] + %s" value)
                         (expand-matcher key)
                         (name table-name)
-                        (clojure.string/join ", " (map name (concat (keys key) [:counter :total])))
-                        (clojure.string/join ", " (concat (map #(str "'" % "'") (vals key)) [1 value]))))))))
+                        (string/join ", " (map #(str "["(format-name %)"]") (concat (keys key) [:counter :total])))
+                        (string/join ", " (concat (map #(str "'" % "'") (vals key)) [1 value]))))))))
 
 (defn new-fact
   "When a new fact occurs update all the corresponding dimensions specified in the fact
@@ -109,5 +115,11 @@
   (let [event (merge categories {fact-id value})
         tx (->> (vals dims)
                 (filter #(not (:group_only %)))
-                (map #(make-dimension-fact fact % event timestamp)))]
+                (map #(make-dimension-fact fact % event timestamp))
+                ;;according to the docs for clojure.java.jdbc/execute! it takes a collection of sql
+                ;;(prepared statement or string). In the function execute-with-transaction exeute is called in a doseq.
+                ;;When there is more than one element in the collections execute! assumes that the first element of
+                ;;the collection is the statement, and the rest of the collections are parameters.
+                ;; That is the short story of why I made this join.
+                (map #(conj [] (string/join "\n" %))))]
     (execute-with-transaction! db tx)))
