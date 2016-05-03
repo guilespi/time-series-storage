@@ -31,10 +31,10 @@
   [db]
   (->> (j/query db
                 (sql
-                 (select sqdb [*]
-                         (from :dimensions))))
+                  (select sqdb [*]
+                          (from :dimensions))))
        (map #(update-in % [:grouped_by] read-string))
-       (map #(update-in % [:group_only] (partial = 1)))
+       (map #(update-in % [:group_only] (partial = true)))
        (map #(update-in % [:facts] read-string))))
 
 
@@ -203,7 +203,6 @@
 (defn- drop-fact-time-series-stmts
   [fact dims]
   (->> (filter (complement :group_only) dims)
-       (filter #(contains? (:facts %) (keyword (:id fact))))
        (map #(drop-time-series-table-stm fact %))
        (apply concat)))
 

@@ -12,7 +12,7 @@
 (def sqdb (sqdb/sqlserver))
 
 (def db-spec (or (System/getenv "DATABASE_URL")
-     "jdbc:sqlserver://localhost:1433;databaseName=prisma;user=datomic;password=datomic"))
+     "jdbc:sqlserver://win7:1433;databaseName=prisma;user=datomic;password=datomic"))
 
 (def service (SqlServer. db-spec))
 
@@ -21,8 +21,7 @@
     (t/drop-schema! service)
     (catch Exception e))
   (t/init-schema! service)
-  (f)
-  )
+  (f))
 
 (use-fixtures :each init-schema-fixture)
 
@@ -67,35 +66,29 @@
                                     :units
                                     :start
                                     :end
-                                    :step])))
-         ))
-
-  )
-
-
+                                    :step]))))))
 (deftest define-dimension
-
-  (t/define-dimension! service :company  {:group_only true                 :name "Compania"})
+  (t/define-dimension! service :company {:group_only true :name "Compania"})
   (t/define-dimension! service :campaign {:grouped_by [[:company]] :name "Campania"})
-  (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+  (t/define-dimension! service :channel {:grouped_by [[:company :campaign]] :name "Canal"})
 
-  (is (= [{:id "company"  :name "Compania" :group_only true  :grouped_by [[]]}
+  (is (= #{{:id "company" :name "Compania" :group_only true :grouped_by [[]]}
           {:id "campaign" :name "Campania" :group_only false :grouped_by [[:company]]}
-          {:id "channel"  :name "Canal"    :group_only false :grouped_by [[:company :campaign]]}]
+          {:id "channel" :name "Canal" :group_only false :grouped_by [[:company :campaign]]}}
          (->> service
               t/dimensions
               (map #(select-keys % [:name
                                     :id
                                     :grouped_by
-                                    :group_only])))))
-    )
+                                    :group_only]))
+              (into #{})))))
 
 
 (deftest new-fact-and-get-timeseries
 
   (t/define-fact! service :signups :counter 10 {:name "Cantidad de registros"
-                                             :filler 0
-                                             :units "counter"})
+                                                :filler 0
+                                                :units "counter"})
 
   (t/define-dimension! service :dependency {:name "Dependencia de Correo" :facts [:signups]})
   (t/define-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario" :facts [:signups]})
@@ -140,14 +133,12 @@
               #inst "2014-03-21T11:00" 0
               #inst "2014-03-21T12:00" 0}
              (-> timeseries
-                 (get {:dependency_user "juanele" :dependency "31"}))))
-      ))
-  )
+                 (get {:dependency_user "juanele" :dependency "31"})))))))
 
 (deftest new-fact-with-counter-not-1-and-get-timeseries
 
   (t/define-fact! service :signups :counter 10 {:name "registros" :filler 0})
-  (t/define-dimension! service :dependency {:name "Dependencia de Correo"})
+  (t/define-dimension! service :dependency {:name "Dependencia de Correo" :facts [:signups]})
 
   ;; pass counter distinct to 1, for example: 3
   (t/new-fact! service :signups #inst "2014-03-21" 3 {:dependency "32"})
@@ -164,38 +155,50 @@
   [db]
   (let [query (sql/sql
                 (sql/select sqdb [:table_name]
-                            (sql/from :information_schema.tables)
-                            (sql/where '(= :table_schema "public"))))]
+                            (sql/from :information_schema.tables)))]
     (->> query
          (j/query db-spec)
          (map :table_name))))
 
 (deftest drop-schema
-  (t/define-fact! service :signups :counter 10 {})
-  (t/define-fact! service :conversions  :counter 10 {})
+  (let [prev-tables  (->>(find-table-names db-spec)
+                                           (filter #(not (or (= "dimensions" %)
+                                                             (= "facts" %))))
+                                           (into #{}))]
+    (t/define-fact! service :signups :counter 10 {})
+    (t/define-fact! service :conversions  :counter 10 {})
 
-  (t/define-dimension! service :company  {:group_only true                 :name "Compania"})
-  (t/define-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
-  (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+    (t/define-dimension! service :company  {:group_only true :name "Compania"})
+    (t/define-dimension! service :campaign {:grouped_by [[:company]] :name "Campania"})
+    (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
 
-  (t/drop-schema! service)
-  (is (= [] (find-table-names db-spec))))
-
+    (t/drop-schema! service)
+    (is (= prev-tables (into #{} (find-table-names db-spec))))))
 
 (deftest drop-schema-keeps-other-tables
-  (j/execute! db-spec
-              (sql/sql (sql/create-table sqdb :random_table_name
-                                         (sql/if-not-exists true))))
-  (t/define-fact! service :signups :counter 10 {})
-  (t/define-fact! service :conversions  :counter 10 {})
+  (let [prev-tables (filter #(not (or (= "dimensions" %)
+                                      (= "facts" %)))
+                            (find-table-names db-spec))]
 
-  (t/define-dimension! service :company  {:group_only true                 :name "Compania"})
-  (t/define-dimension! service :campaign {:grouped_by [[:company]]           :name "Campania"})
-  (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
+    (try (j/with-db-connection [connection db-spec]
+           (j/execute! connection
+                       (sql/sql (sql/create-table sqdb :random_table_name
+                                                  (sql/column :dummy :varchar :length 40 :primary-key? true)))))
+         (catch Exception e))
+    (t/define-fact! service :signups :counter 10 {})
+    (t/define-fact! service :conversions  :counter 10 {})
 
-  (t/drop-schema! service)
+    (t/define-dimension! service :company  {:group_only true :name "Compania"})
+    (t/define-dimension! service :campaign {:grouped_by [[:company]] :name "Campania"})
+    (t/define-dimension! service :channel  {:grouped_by [[:company :campaign]] :name "Canal"})
 
-  (is (= ["random_table_name"] (find-table-names db-spec)))
+    (t/drop-schema! service)
 
-  (j/execute! db-spec
-              (sql/sql (sql/drop-table sqdb [:random_table_name]))))
+    (is (= (->> ["random_table_name"]
+                (concat prev-tables)
+                (into #{}))
+           (->> (find-table-names db-spec)
+                (into #{}))))
+
+    (j/execute! db-spec
+                (sql/sql (sql/drop-table sqdb [:random_table_name])))))
