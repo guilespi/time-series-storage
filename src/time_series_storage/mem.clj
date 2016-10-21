@@ -143,7 +143,7 @@
     (map second (:dimensions @config)))
 
   (new-fact! [service fact-id value categories]
-    (api/new-fact! service
+    (api/new-fact! config
                    fact-id
                    (java.util.Date.)
                    value
@@ -168,7 +168,7 @@
       (throw (Exception. (format "Fact %s is not defined" fact-id)))))
 
   (inc! [service fact-id categories]
-    (api/inc! service
+    (api/inc! config
               fact-id
               (java.util.Date.)
               categories))
@@ -178,7 +178,7 @@
       (if-let [dims (->> (select-keys (:dimensions @config) (keys categories))
                          (filter (fn [[k d]] (contains? (:facts d) fact-id)))
                          seq)]
-        (new-fact service
+        (new-fact config
                   fact
                   (tcoerce/from-date timestamp)
                   1
