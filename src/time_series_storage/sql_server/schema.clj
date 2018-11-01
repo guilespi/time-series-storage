@@ -251,5 +251,6 @@
         tx (conj time-series-tables
                  (update-dimension id (assoc dimension
                                              :facts
-                                             (conj (:facts dimension) fact))))]
+                                             (conj (:facts dimension)
+                                                   (keyword (:id fact))))))]
     (execute-with-transaction! db (map sql tx))))
