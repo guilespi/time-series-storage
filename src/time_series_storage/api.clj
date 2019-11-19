@@ -32,6 +32,7 @@
 
   (get-timeseries [service fact dimension query-data start finish]
                   [service fact dimension query-data start finish step]
+                  [service fact dimension query-data start finish step offset]
     "Retrieves the complete timeseries for the queried range of the fact")
 
   (get-histogram [service fact dimension query-data start finish]

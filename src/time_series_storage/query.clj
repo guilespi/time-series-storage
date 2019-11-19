@@ -4,8 +4,9 @@
             [clj-time.core :as t]))
 
 (defn time-dimension
-  [collapse-by row]
-  (let [date (tcoerce/from-string (:timestamp row))
+  [collapse-by offset row]
+  (let [date (t/plus (tcoerce/from-string (:timestamp row))
+                     (t/hours offset))
         dow (t/day-of-week date)]
     (condp = collapse-by
       :day (tformat/unparse (tformat/formatters :basic-date-time)
@@ -37,7 +38,7 @@
 
 ;;TODO: this should be done inside the library with knowledge about
 ;;the dimension type not here infering stuff
-(defmulti collapse (fn [[r & rest] by]
+(defmulti collapse (fn [[r & rest] by offset]
                      (cond
                       (and (:counter r)
                            (:total r)) :average
@@ -45,11 +46,11 @@
                       :else :default)))
 
 (defmethod collapse :counter
-  [rows by]
+  [rows by offset]
   (apply merge
    (for [[k v] (group-by #(select-keys % (keys (dissoc % :counter :timestamp)))
                          rows)]
-     {k  (->> (group-by (partial time-dimension by) v)
+     {k  (->> (group-by (partial time-dimension by offset) v)
               (map (fn [[k v]]
                      {(or (tcoerce/from-string k)
                           k) (reduce #(+ %1 (:counter %2)) 0 v)}))
@@ -57,12 +58,12 @@
 
 
 (defmethod collapse :average
-  [rows by]
+  [rows by offset]
 
   (apply merge
          (for [[k v] (group-by #(select-keys % (keys (dissoc % :counter :timestamp :total)))
                                rows)]
-           {k (->> (group-by (partial time-dimension by) v)
+           {k (->> (group-by (partial time-dimension by offset) v)
                 (map (fn [[k v]]
                        {(or (tcoerce/from-string k) k) (reduce #(merge-with + %1 (select-keys %2 [:counter
                                                                                            :total]))
@@ -72,12 +73,12 @@
                 (apply merge))})))
 
 (defmethod collapse :histogram
-  [rows by]
+  [rows by offset]
   (throw (Exception. "histogram collapsing not yet ready")))
 
 
 (defmethod collapse :default
-  [rows by]
+  [rows by offset]
   {})
 
 (defn time-range
@@ -109,8 +110,9 @@
                          ;;TODO the filler should be by dimension definition
                          {(tcoerce/to-date date) (or (get series date) 0)}))}))))
 
-(defn collapse-and-fill-range [data start finish step]
-  (-> (collapse data step)
+(defn collapse-and-fill-range
+  [data start finish step offset]
+  (-> (collapse data step offset)
       (fill-range start
                   finish
                   step)))

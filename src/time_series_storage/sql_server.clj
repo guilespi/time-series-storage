@@ -100,7 +100,7 @@
         (throw (Exception. "None of the dimensions specified track the supplied fact")))
       (throw (Exception. (format "Fact %s is not defined" fact-id)))))
 
-  (get-timeseries [service fact dimension query-data start finish step]
+  (get-timeseries [service fact dimension query-data start finish step offset]
     (if-let [fact-def (schema/get-fact config fact)]
       (if-let [dim-def (schema/get-dimension config dimension)]
         (-> (q/query config
@@ -112,12 +112,16 @@
             (collapse-and-fill-range
               start
               finish
-              (or step :none)))
+              (or step :none)
+              offset))
         (throw (Exception. (format "Non existent dimension %s specified. Please check your schema" dimension))))
       (throw (Exception. (format "Non existent fact %s specified. Please check your schema." fact)))))
 
+  (get-timeseries [service fact dimension query-data start finish step]
+    (api/get-timeseries service fact dimension query-data start finish nil 0))
+
   (get-timeseries [service fact dimension query-data start finish]
-    (api/get-timeseries service fact dimension query-data start finish nil))
+    (api/get-timeseries service fact dimension query-data start finish nil 0))
 
   (get-histogram [service fact dimension query-data start finish]
                  [service fact dimension query-data start finish merge-with]
