@@ -9,7 +9,7 @@
             [clj-time.coerce :as tcoerce])
   (:import [time_series_storage.postgres Postgres]))
 
-(def sqdb (sqdb/postgresql))
+(def sqdb (sqdb/db :postgresql))
 
 (def db-spec (or (System/getenv "DATABASE_URL")
   "postgresql://postgres:postgres@localhost:5432/timeseries_test"))

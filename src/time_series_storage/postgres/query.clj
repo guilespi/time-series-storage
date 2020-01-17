@@ -5,7 +5,7 @@
   (:use sqlingvo.core
         time-series-storage.postgres.common))
 
-(def sqdb (sqdb/postgresql))
+(def sqdb (sqdb/db :postgresql))
 
 (defn- range-where
   "Retrieves a time-ranged condition for a specific fact in

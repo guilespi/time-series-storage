@@ -6,7 +6,7 @@
   (:use sqlingvo.core
         time-series-storage.postgres.common))
 
-(def sqdb (sqdb/postgresql))
+(def sqdb (sqdb/db :postgresql))
 
 (defn event-key
   "Returns the particular key for updating a fact in a specific dimension.

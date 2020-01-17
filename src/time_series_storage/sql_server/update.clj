@@ -7,7 +7,7 @@
   (:use sqlingvo.core
         time-series-storage.sql-server.common))
 
-(def sqdb (sqdb/sqlserver))
+(def sqdb (sqdb/db :sqlserver))
 
 (defn- format-name
   [n]
