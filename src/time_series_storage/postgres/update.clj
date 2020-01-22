@@ -104,5 +104,4 @@
                 (filter #(not (:group_only %)))
                 (map #(make-dimension-fact fact % event timestamp))
                 (apply concat))]
-    ; Note: we used to apply (map sqlingvo.core/sql) but that changed with the on-conflict issue
     (execute-with-transaction! db tx)))
