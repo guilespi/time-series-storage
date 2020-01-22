@@ -12,20 +12,20 @@
    a specific dimension path"
   [slice filter-data start finish]
   `(and ~@(for [[k v] filter-data]
-            `(= ~k ~v))
+                `(= ~k ~v))
         (>= :timestamp ~(get-slice slice start))
         (<= :timestamp ~(get-slice slice finish))))
 
 (defn- best-grouping
   [groupings dimension data]
   (conj
-    (first
-      ;;always add dimension as part of the grouping keys to enable
-      ;;filtering by the last dimension too
-      (drop-while #(not= (set (conj (keys data) dimension))
-                         (set (conj (keys (select-keys data %)) dimension)))
-                  groupings))
-    dimension))
+   (first
+    ;;always add dimension as part of the grouping keys to enable
+    ;;filtering by the last dimension too
+    (drop-while #(not= (set (conj (keys data) dimension))
+                       (set (conj (keys (select-keys data %)) dimension)))
+                groupings))
+   dimension))
 
 (defn query
   "Retrieves a particular range of values for the specified fact and dimension."
@@ -41,7 +41,7 @@
                                start
                                finish)]
     (j/query db
-             (sql
-               (select sqdb [*]
-                       (from table-name)
-                       (where condition))))))
+      (sql
+       (select sqdb [*]
+               (from table-name)
+               (where condition))))))

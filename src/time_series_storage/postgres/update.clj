@@ -54,13 +54,15 @@
                 (let [sql-stmt (-> (insert sqdb (sql/as table-name :target) (conj (keys key) :counter)
                                            (select sqdb (vec (conj (vals key) value))))
                                    sql/sql)]
-                  ; this old version of sqlingvo does not support on-conflict (updating breaks blob-storage)
+                  ; this version of sqlingvo does not support on-conflict
                   (apply vector
-                         (str (sql-stmt 0)
-                              " ON CONFLICT (" (str-join "," (map #(sql/sql-quote sqdb (name %))
-                                                                  (keys key))) ")"
-                              " DO UPDATE SET"
-                              " counter = target.counter + " value)
+                         (format "%s ON CONFLICT (%s) DO UPDATE SET counter = target.counter + %d"
+                                 (sql-stmt 0)
+                                 (->> (keys key)
+                                      (map name)
+                                      (map #(sql/sql-quote sqdb %))
+                                      (str-join ", "))
+                                 value)
                          (rest sql-stmt))))))))
 
 (defmethod make-dimension-fact :average
@@ -77,14 +79,15 @@
                 (let [sql-stmt (-> (insert sqdb (sql/as table-name :target) (concat (keys key) [:counter :total])
                                            (select sqdb (conj (vec (vals key)) 1 value)))
                                    sql/sql)]
-                  ; this old version of sqlingvo does not support on-conflict (updating breaks blob-storage)
+                  ; this version of sqlingvo does not support on-conflict
                   (apply vector
-                         (str (sql-stmt 0)
-                              " ON CONFLICT (" (str-join "," (map #(sql/sql-quote sqdb (name %))
-                                                                  (keys key))) ")"
-                              " DO UPDATE SET"
-                              " counter = target.counter + 1,"
-                              " total = target.total + " value)
+                         (format "%s ON CONFLICT (%s) DO UPDATE SET counter = target.counter + 1, total = target.total + %d"
+                                 (sql-stmt 0)
+                                 (->> (keys key)
+                                      (map name)
+                                      (map #(sql/sql-quote sqdb %))
+                                      (str-join ", "))
+                                 value)
                          (rest sql-stmt))))))))
 
 (defn new-fact
@@ -97,5 +100,5 @@
                 (filter #(not (:group_only %)))
                 (map #(make-dimension-fact fact % event timestamp))
                 (apply concat))]
-    ; Note: we use to apply (map sqlingvo.core/sql) but that changed with the on-conflict issue
+    ; Note: we used to apply (map sqlingvo.core/sql) but that changed with the on-conflict issue
     (execute-with-transaction! db tx)))
