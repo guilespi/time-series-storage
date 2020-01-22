@@ -5,7 +5,7 @@
   (:use sqlingvo.core
         time-series-storage.sql-server.common))
 
-(def sqdb (sqdb/db :sqlserver))
+(def sqdb (sqdb/sqlserver))
 
 (defn- range-where
   "Retrieves a time-ranged condition for a specific fact in

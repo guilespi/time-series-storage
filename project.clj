@@ -8,5 +8,5 @@
                  [org.postgresql/postgresql "42.1.4.jre7"]
                  [com.microsoft.sqlserver/sqljdbc4 "4.2"]
                  [clj-time "0.15.0"]
-                 [sqlingvo "0.9.31"]]
+                 [sqlingvo "0.7.10"]]
   :profiles {:1.7.0 {:dependencies [[org.clojure/clojure "1.7.0-RC1"]]}})

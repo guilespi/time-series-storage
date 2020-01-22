@@ -9,7 +9,7 @@
             [clj-time.coerce :as tcoerce])
   (:import [time_series_storage.sql_server SqlServer]))
 
-(def sqdb (sqdb/db :sqlserver))
+(def sqdb (sqdb/sqlserver))
 
 (def db-spec (or (System/getenv "DATABASE_URL")
      "jdbc:sqlserver://win7:1433;databaseName=prisma;user=datomic;password=datomic"))

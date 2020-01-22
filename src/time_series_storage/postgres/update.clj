@@ -6,7 +6,7 @@
   (:use sqlingvo.core
         time-series-storage.postgres.common))
 
-(def sqdb (sqdb/db :postgresql))
+(def sqdb (sqdb/postgresql))
 
 (defn event-key
   "Returns the particular key for updating a fact in a specific dimension.
@@ -64,10 +64,16 @@
                   pkey-name (tablename->pkey (name table-name))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (insert sqdb table-name (conj (keys key) :counter)
-                        (values [(vec (conj (vals key) value))])
-                        (on-conflict-on-constraint (keyword pkey-name)
-                                                   (do-update {:counter (symbol (str "counter+" value))}))))))))
+                (let [sql-stmt (-> (insert sqdb table-name (conj (keys key) :counter)
+                                           (select sqdb (vec (conj (vals key) value))))
+                                   sqlingvo.core/sql)]
+                  ; this old version of sqlingvo does not support on-conflict (updating breaks blob-storage)
+                  (apply vector
+                         (str (sql-stmt 0) " ON CONFLICT ON CONSTRAINT"
+                              " \"" pkey-name "\""
+                              " DO UPDATE SET"
+                              " counter = counter + " value)
+                         (rest sql-stmt))))))))
 
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
@@ -81,11 +87,17 @@
                   pkey-name (tablename->pkey (name table-name))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (insert sqdb table-name (concat (keys key) [:counter :total])
-                        (values [(conj (vec (vals key)) 1 value)])
-                        (on-conflict-on-constraint (keyword pkey-name)
-                                                   (do-update {:counter '(+ counter 1)
-                                                               :total   (symbol (str "total+" value))}))))))))
+                (let [sql-stmt (-> (insert sqdb table-name (concat (keys key) [:counter :total])
+                                           (select sqdb (conj (vec (vals key)) 1 value)))
+                                   sqlingvo.core/sql)]
+                  ; this old version of sqlingvo does not support on-conflict (updating breaks blob-storage)
+                  (apply vector
+                         (str (sql-stmt 0) " ON CONFLICT ON CONSTRAINT"
+                              " \"" pkey-name "\""
+                              " DO UPDATE SET"
+                              " counter = counter + 1,"
+                              " total = total + " value)
+                         (rest sql-stmt))))))))
 
 (defn new-fact
   "When a new fact occurs update all the corresponding dimensions specified in the fact
@@ -97,4 +109,5 @@
                 (filter #(not (:group_only %)))
                 (map #(make-dimension-fact fact % event timestamp))
                 (apply concat))]
-    (execute-with-transaction! db (map sql tx))))
+    ; Note: we use to apply (map sqlingvo.core/sql) but that changed with the on-conflict issue
+    (execute-with-transaction! db tx)))

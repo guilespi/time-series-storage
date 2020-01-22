@@ -6,7 +6,7 @@
   (:use sqlingvo.core
         time-series-storage.postgres.common))
 
-(def sqdb (sqdb/db :postgresql))
+(def sqdb (sqdb/postgresql))
 
 (defn get-fact
   "Retrieves a fact definition from database, nil if fact does not exists"
