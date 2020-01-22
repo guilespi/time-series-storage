@@ -1,6 +1,8 @@
 (ns time-series-storage.postgres.update
   (:refer-clojure :exclude [distinct group-by update])
   (:require [clojure.java.jdbc :as j]
+            [clojure.string :refer [join] :rename {join str-join}]
+            [sqlingvo.core :as sql]
             [sqlingvo.db :as sqdb]
             [time-series-storage.postgres.schema :as schema])
   (:use sqlingvo.core
@@ -38,20 +40,6 @@
 
 (defmulti make-dimension-fact (fn [f _ _ _] (keyword (:type f))))
 
-; From postgres: 63-byte type for storing system identifiers
-(def PG_NAME_LENGTH 63)
-(def PKEY_SUFFIX "_pkey")
-
-(defn tablename->pkey
-  "Returns a valid and unique name for the constraint"
-  [table-name]
-  (let [hex-hash (format "_%08x" (hash table-name))
-        max-length (- PG_NAME_LENGTH (count PKEY_SUFFIX) (count hex-hash))
-        prefix (if (> (count table-name) max-length)
-                 (subs table-name 0 max-length)
-                 table-name)]
-    (str prefix hex-hash PKEY_SUFFIX)))
-
 (defmethod make-dimension-fact :counter
   ;;Makes a statement for upserting counters on a specific fact and
   ;;dimension hierarchy
@@ -61,18 +49,18 @@
           (for [group (:grouped_by dimension)]
             (let [table-name (->> (conj group (:id dimension))
                                   (make-table-name fact))
-                  pkey-name (tablename->pkey (name table-name))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (let [sql-stmt (-> (insert sqdb table-name (conj (keys key) :counter)
+                (let [sql-stmt (-> (insert sqdb (sql/as table-name :target) (conj (keys key) :counter)
                                            (select sqdb (vec (conj (vals key) value))))
-                                   sqlingvo.core/sql)]
+                                   sql/sql)]
                   ; this old version of sqlingvo does not support on-conflict (updating breaks blob-storage)
                   (apply vector
-                         (str (sql-stmt 0) " ON CONFLICT ON CONSTRAINT"
-                              " \"" pkey-name "\""
+                         (str (sql-stmt 0)
+                              " ON CONFLICT (" (str-join "," (map #(sql/sql-quote sqdb (name %))
+                                                                  (keys key))) ")"
                               " DO UPDATE SET"
-                              " counter = counter + " value)
+                              " counter = target.counter + " value)
                          (rest sql-stmt))))))))
 
 (defmethod make-dimension-fact :average
@@ -84,19 +72,19 @@
           (for [group (:grouped_by dimension)]
             (let [table-name (->> (conj group (:id dimension))
                                   (make-table-name fact))
-                  pkey-name (tablename->pkey (name table-name))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (let [sql-stmt (-> (insert sqdb table-name (concat (keys key) [:counter :total])
+                (let [sql-stmt (-> (insert sqdb (sql/as table-name :target) (concat (keys key) [:counter :total])
                                            (select sqdb (conj (vec (vals key)) 1 value)))
-                                   sqlingvo.core/sql)]
+                                   sql/sql)]
                   ; this old version of sqlingvo does not support on-conflict (updating breaks blob-storage)
                   (apply vector
-                         (str (sql-stmt 0) " ON CONFLICT ON CONSTRAINT"
-                              " \"" pkey-name "\""
+                         (str (sql-stmt 0)
+                              " ON CONFLICT (" (str-join "," (map #(sql/sql-quote sqdb (name %))
+                                                                  (keys key))) ")"
                               " DO UPDATE SET"
-                              " counter = counter + 1,"
-                              " total = total + " value)
+                              " counter = target.counter + 1,"
+                              " total = target.total + " value)
                          (rest sql-stmt))))))))
 
 (defn new-fact
