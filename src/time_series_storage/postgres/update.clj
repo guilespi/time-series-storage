@@ -51,7 +51,9 @@
                                   (make-table-name fact))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (let [sql-stmt (-> (insert sqdb (sql/as table-name :target) (conj (keys key) :counter)
+                (let [sql-stmt (-> (insert sqdb
+                                           (sql/as table-name :target)
+                                           (conj (keys key) :counter)
                                            (select sqdb (vec (conj (vals key) value))))
                                    sql/sql)]
                   ; this version of sqlingvo does not support on-conflict
@@ -76,7 +78,9 @@
                                   (make-table-name fact))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (let [sql-stmt (-> (insert sqdb (sql/as table-name :target) (concat (keys key) [:counter :total])
+                (let [sql-stmt (-> (insert sqdb
+                                           (sql/as table-name :target)
+                                           (concat (keys key) [:counter :total])
                                            (select sqdb (conj (vec (vals key)) 1 value)))
                                    sql/sql)]
                   ; this version of sqlingvo does not support on-conflict
