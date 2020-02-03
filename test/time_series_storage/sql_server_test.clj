@@ -124,7 +124,8 @@
                                        {:dependency nil}
                                        #inst "2014-03-21T09:00"
                                        #inst "2014-03-21T13:00"
-                                       :hour)]
+                                       :hour
+                                       1)]
       (is (= #{{:dependency_user "juanele" :dependency "31"}
                {:dependency_user "pepe" :dependency "32"}}
              (set (keys timeseries))))
