@@ -51,9 +51,9 @@
        (string/join " AND ")))
 
 (def upsert-query-string ""
-  "IF EXISTS (select * FROM %s WITH (updlock,serializable) where %s)
+  "IF EXISTS (select * FROM %s WITH (updlock) where %s)
      BEGIN
-          UPDATE %s WITH (updlock)
+          UPDATE %s WITH 
           SET %s
           WHERE %s
      END
