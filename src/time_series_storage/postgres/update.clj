@@ -1,6 +1,8 @@
 (ns time-series-storage.postgres.update
   (:refer-clojure :exclude [distinct group-by update])
   (:require [clojure.java.jdbc :as j]
+            [clojure.string :refer [join] :rename {join str-join}]
+            [sqlingvo.core :as sql]
             [sqlingvo.db :as sqdb]
             [time-series-storage.postgres.schema :as schema])
   (:use sqlingvo.core
@@ -49,14 +51,21 @@
                                   (make-table-name fact))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (with sqdb [:upsert (update sqdb table-name
-                                            `((:= ~'counter
-                                                  ~(symbol (str "counter+" value))))
-                                            (where (expand-condition key))
-                                            (returning *))]
-                      (insert sqdb table-name (conj (keys key) :counter)
-                              (select sqdb (conj (vals key) value))
-                              (where `(not-exists ~(select sqdb [*] (from :upsert)))))))))))
+                (let [sql-stmt (-> (insert sqdb
+                                           (sql/as table-name :target)
+                                           (conj (keys key) :counter)
+                                           (select sqdb (vec (conj (vals key) value))))
+                                   sql/sql)]
+                  ; this version of sqlingvo does not support on-conflict
+                  (apply vector
+                         (format "%s ON CONFLICT (%s) DO UPDATE SET counter = target.counter + %d"
+                                 (sql-stmt 0)
+                                 (->> (keys key)
+                                      (map name)
+                                      (map #(sql/sql-quote sqdb %))
+                                      (str-join ", "))
+                                 value)
+                         (rest sql-stmt))))))))
 
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
@@ -69,16 +78,21 @@
                                   (make-table-name fact))
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
-                (with sqdb [:upsert (update sqdb table-name
-                                            (conj '()
-                                                  '(= counter counter+1)
-                                                  (concat '(= total)
-                                                          [(symbol (str "total+" value))]))
-                                            (where (expand-condition key))
-                                            (returning *))]
-                      (insert sqdb table-name (concat (keys key) [:counter :total])
-                              (select sqdb (conj (vec (vals key)) 1 value))
-                              (where `(not-exists ~(select sqdb [*] (from :upsert)))))))))))
+                (let [sql-stmt (-> (insert sqdb
+                                           (sql/as table-name :target)
+                                           (concat (keys key) [:counter :total])
+                                           (select sqdb (conj (vec (vals key)) 1 value)))
+                                   sql/sql)]
+                  ; this version of sqlingvo does not support on-conflict
+                  (apply vector
+                         (format "%s ON CONFLICT (%s) DO UPDATE SET counter = target.counter + 1, total = target.total + %d"
+                                 (sql-stmt 0)
+                                 (->> (keys key)
+                                      (map name)
+                                      (map #(sql/sql-quote sqdb %))
+                                      (str-join ", "))
+                                 value)
+                         (rest sql-stmt))))))))
 
 (defn new-fact
   "When a new fact occurs update all the corresponding dimensions specified in the fact
@@ -90,4 +104,4 @@
                 (filter #(not (:group_only %)))
                 (map #(make-dimension-fact fact % event timestamp))
                 (apply concat))]
-    (execute-with-transaction! db (map sql tx))))
+    (execute-with-transaction! db tx)))

@@ -97,8 +97,10 @@
                                              :filler 0
                                              :units "counter"})
 
-  (t/define-dimension! service :dependency {:name "Dependencia de Correo"})
-  (t/define-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"})
+  (t/define-dimension! service :dependency {:name "Dependencia de Correo"
+                                            :facts #{:signups}})
+  (t/define-dimension! service :dependency_user {:grouped_by [[:dependency]] :name "Usuario"
+                                                 :facts #{:signups}})
 
   (t/new-fact! service :signups #inst "2014-03-21T09:09" 1 {:dependency "32" :dependency_user "pepe"})
   (t/new-fact! service :signups #inst "2014-03-21T10:23" 1 {:dependency "31" :dependency_user "juanele"})
@@ -131,7 +133,8 @@
                                        {:dependency nil}
                                        #inst "2014-03-21T09:00"
                                        #inst "2014-03-21T13:00"
-                                       :hour)]
+                                       :hour
+                                       1)]
       (is (= #{{:dependency_user "juanele" :dependency "31"}
                {:dependency_user "pepe" :dependency "32"}}
              (set (keys timeseries))))
@@ -147,7 +150,8 @@
 (deftest new-fact-with-counter-not-1-and-get-timeseries
 
   (t/define-fact! service :signups :counter 10 {:name "registros" :filler 0})
-  (t/define-dimension! service :dependency {:name "Dependencia de Correo"})
+  (t/define-dimension! service :dependency {:name "Dependencia de Correo"
+                                            :facts #{:signups}})
 
   ;; pass counter distinct to 1, for example: 3
   (t/new-fact! service :signups #inst "2014-03-21" 3 {:dependency "32"})
