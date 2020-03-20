@@ -53,7 +53,7 @@
 (def upsert-query-string ""
   "IF EXISTS (select * FROM %s WITH (updlock) where %s)
      BEGIN
-          UPDATE %s WITH 
+          UPDATE %s
           SET %s
           WHERE %s
      END
