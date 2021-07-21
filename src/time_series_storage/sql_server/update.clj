@@ -50,18 +50,12 @@
          (format "[%s] = '%s'" (format-name k) v))
        (string/join " AND ")))
 
-(def upsert-query-string ""
-  "IF EXISTS (select * FROM %s WITH (updlock) where %s)
-     BEGIN
-          UPDATE %s
-          SET %s
-          WHERE %s
-     END
-   ELSE
-     BEGIN
-          INSERT %s
-          (%s) VALUES (%s)
-     END")
+(def upsert-query-string
+  "BEGIN
+    UPDATE %s SET %s WHERE %s
+    IF @@ROWCOUNT = 0
+      INSERT INTO %s (%s) VALUES(%s)
+  END")
 
 (defmulti make-dimension-fact (fn [f _ _ _] (keyword (:type f))))
 
@@ -77,8 +71,6 @@
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
                 (format upsert-query-string
-                        (name table-name)
-                        (expand-matcher key)
                         (name table-name)
                         (str "[counter] = [counter] + " value)
                         (expand-matcher key)
@@ -98,8 +90,6 @@
                   value (get event (:id fact))]
               (when-let [key (event-key fact dimension group event date-time)]
                 (format upsert-query-string
-                        (name table-name)
-                        (expand-matcher key)
                         (name table-name)
                         (format "[counter] = [counter] + 1, [total] = [total] + %s" value)
                         (expand-matcher key)
