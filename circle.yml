@@ -2,7 +2,11 @@ machine:
   environment:
     DATABASE_URL: postgres://ubuntu:@127.0.0.1:5432/circle_test
 
+
 jobs:
-  tests:
+  test:
+    docker:
+      - image: cimg/openjdk:8.0
     steps:
+      - checkout
       - run: lein with-profile 1.7.0 test
