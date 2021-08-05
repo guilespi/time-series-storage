@@ -11,7 +11,7 @@
 
 (def sqdb (sqdb/sqlserver))
 
-(def db-spec (or (System/getenv "DATABASE_URL")
+(def db-spec (or (System/getenv "SQLSRV_URL")
      "jdbc:sqlserver://win7:1433;databaseName=prisma;user=datomic;password=datomic"))
 
 (def service (SqlServer. db-spec))

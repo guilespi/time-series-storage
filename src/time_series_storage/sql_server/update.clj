@@ -45,9 +45,10 @@
             `(= ~k ~v))))
 
 (defn expand-matcher
-  [keyvals]
+  [keyvals params]
   (->> (for [[k v] keyvals]
-         (format "[%s] = '%s'" (format-name k) v))
+         (do (swap! params #(conj % v))
+             (format "[%s] = ?" (format-name k))))
        (string/join " AND ")))
 
 (def upsert-query-string
@@ -68,15 +69,20 @@
           (for [group (:grouped_by dimension)]
             (let [table-name (format-name (->> (conj group (:id dimension))
                                                (make-table-name fact)))
-                  value (get event (:id fact))]
+                  value (get event (:id fact))
+                  params (atom [value])]
               (when-let [key (event-key fact dimension group event date-time)]
-                (format upsert-query-string
-                        (name table-name)
-                        (str "[counter] = [counter] + " value)
-                        (expand-matcher key)
-                        (name table-name)
-                        (string/join ", " (map #(str "["(format-name %)"]") (conj (keys key) :counter)))
-                        (string/join ", " (conj (map #(str "'" % "'") (vals key)) value))))))))
+                (vec (concat
+                       [(format upsert-query-string
+                                (name table-name)
+                                (str "[counter] = [counter] + ?")
+                                (expand-matcher key params)
+                                (name table-name)
+                                (string/join ", " (map #(str "[" (format-name %) "]") (cons :counter (keys key))))
+                                (string/join ", " (map (constantly "?") (cons :counter (vals key)))))]
+                       @params
+                       [value]
+                       (vals key))))))))
 
 (defmethod make-dimension-fact :average
   ;;Makes a statement for upserting averages on a specific fact and
@@ -87,15 +93,20 @@
           (for [group (:grouped_by dimension)]
             (let [table-name  (format-name (->> (conj group (:id dimension))
                                                 (make-table-name fact)))
-                  value (get event (:id fact))]
+                  value (get event (:id fact))
+                  params (atom [value])]
               (when-let [key (event-key fact dimension group event date-time)]
-                (format upsert-query-string
-                        (name table-name)
-                        (format "[counter] = [counter] + 1, [total] = [total] + %s" value)
-                        (expand-matcher key)
-                        (name table-name)
-                        (string/join ", " (map #(str "["(format-name %)"]") (concat (keys key) [:counter :total])))
-                        (string/join ", " (concat (map #(str "'" % "'") (vals key)) [1 value]))))))))
+                (vec (concat
+                       [(format upsert-query-string
+                                (name table-name)
+                                "[counter] = [counter] + 1, [total] = [total] + ?"
+                                (expand-matcher key params)
+                                (name table-name)
+                                (string/join ", " (map #(str "[" (format-name %) "]") (concat (keys key) [:counter :total])))
+                                (string/join ", " (map (constantly "?") (concat (vals key) [:counter :total]))))]
+                       @params
+                       (vals key)
+                       [1 value])))))))
 
 (defn new-fact
   "When a new fact occurs update all the corresponding dimensions specified in the fact
@@ -105,11 +116,8 @@
   (let [event (merge categories {fact-id value})
         tx (->> (vals dims)
                 (filter #(not (:group_only %)))
-                (map #(make-dimension-fact fact % event timestamp))
-                ;;according to the docs for clojure.java.jdbc/execute! it takes a collection of sql
-                ;;(prepared statement or string). In the function execute-with-transaction exeute is called in a doseq.
-                ;;When there is more than one element in the collections execute! assumes that the first element of
-                ;;the collection is the statement, and the rest of the collections are parameters.
-                ;; That is the short story of why I made this join.
-                (map #(conj [] (string/join "\n" %))))]
+                ;; make-dimension-fact returns a list of prepared statements
+                ;; i.e.: a vector of a sql string and parameters)
+                ;; we concat all of them in order to make a single list
+                (mapcat #(make-dimension-fact fact % event timestamp)))]
     (execute-with-transaction! db tx)))
