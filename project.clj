@@ -3,8 +3,8 @@
   :url "https://github.com/guilespi/time-series-storage"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/java.jdbc "0.3.5"]
+  :dependencies [[org.clojure/clojure "1.9.0"]
+                 [org.clojure/java.jdbc "0.7.9"]
                  [postgresql/postgresql "8.4-702.jdbc4"]
                  [com.microsoft.sqlserver/sqljdbc4 "4.2"]
                  [clj-time "0.8.0"]
